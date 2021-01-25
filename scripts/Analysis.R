@@ -17,18 +17,20 @@ stop <- T # Whether to stop on the first failure to reject
 free_core <- T # Whether to leave a free core for the OS
 save <- T  # whether to save results
 name <- "" # A name string for saving
+reps <- 2 # Number of repetitions of the sim function for repeat_sim
+sim <- sim_NN # The simulation function to repeat
+params <- list( # parameters to pass to sim
+  NN_range = c(seq(100,1000,by=100), seq(1500,3000,by=500), 4000, 5000)
+ ,DD = DD
+ ,BO = BO
+ ,TrueG = TrueG
+ ,LL = LL
+ ,Gmax = Gmax
+ ,stop = stop
+ ,free_core = free_core)
 
-# This range is length 16 because the getafix cluster cpus have 16 cores
-NN_range <- c(seq(100,1000,by=100), seq(1500,3000,by=500), 4000, 5000)
-sim_NN_params <- list(NN_range = NN_range
-                      ,DD = DD
-                      ,BO = BO
-                      ,TrueG = TrueG
-                      ,LL = LL
-                      ,Gmax = Gmax
-                      ,stop = stop
-                      ,free_core = free_core)
-results <- repeat_sim(sim_NN, sim_NN_params, 2, save, name, parallel)
+
+results <- repeat_sim(sim, params, reps, save, name, parallel)
 
 saveRDS(results, file = "results.rds")
 
