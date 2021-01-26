@@ -6,31 +6,24 @@ packages <- c("mclust",
               "foreach")
 load_packages(packages)
 
-config <- list(
-  sim = sim_NN     # The simulation function to repeat
+config <- create_config(
+  sim = sim_NN     # the simulation function to repeat
  # ,NN = 2000        # n_1 (n_2) or n/2 sample size
- ,DD = 2           # Dimension of mixture model
- ,BO = 0.2         # Difference in mixtures for MixSim function
- ,TrueG = 4        # Generative number of components
+ ,NN_range = c(seq(100,1000,by=100), seq(1500,3000,by=500), 4000, 5000)
+ ,DD = 2           # dimension of mixture model
+ ,BO = 0.2         # difference in mixtures for MixSim function
+ ,TrueG = 4        # generative number of components
  ,LL = 1           # additional components in alternative
- ,Gmax = TrueG + 5 # force stop procedure when Gmax is reached
- ,parallel = T     # If you experience trouble try setting parallel = FALSE
- ,stop = T         # Whether to stop on the first failure to reject
+ ,Gextra = 5       # force stop procedure when GG = TrueG + Gextra
+ ,parallel = T     # if you experience trouble try setting parallel = FALSE
+ ,stop = T         # whether to stop on the first failure to reject
  ,free_core = T    # Whether to leave a free core for the OS
  ,save = T         # whether to save results
- ,reps = 2         # Number of repetitions of the sim function for repeat_sim
+ ,reps = 1         # number of repetitions of the sim function for repeat_sim
  ,name = ""        # A name string for saving
- ,params = list(   # parameters to pass to sim
-    NN_range = c(seq(100,1000,by=100), seq(1500,3000,by=500), 4000, 5000)
-   ,DD = DD
-   ,BO = BO
-   ,TrueG = TrueG
-   ,LL = LL
-   ,Gmax = Gmax
-   ,stop = stop
-   ,free_core = free_core))
+)
 
-results <- repeat_sim(sim, params, reps, save, name, parallel)
+results <- repeat_sim(config)
 
 saveRDS(results, file = "results.rds")
 

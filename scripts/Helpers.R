@@ -15,6 +15,12 @@ combine_print_save <- function (a, ...) {
   c(a, list(...))
 }
 
+create_config <- function(...) {
+  args <- list(...)
+  c(Gmax = args$TrueG + args$Gextra, args)
+}
+
+
 # Sim functions -----------------------------------------------------------
 
 one_g_step <- function(Data1, Data2, GG, LL) {
@@ -67,8 +73,17 @@ one_procedure <- function(Sim_para, LL, NN, Gmax, stop) {
   return(results)  
 }
 
-sim_NN <- function(NN_range, DD, BO, TrueG, LL, Gmax, 
-                   parallel = T, stop, free_core) {
+sim_NN <- function(config) {
+  
+  NN_range  <- config$NN_range   
+  DD        <- config$DD        
+  BO        <- config$BO        
+  TrueG     <- config$TrueG      
+  LL        <- config$LL        
+  Gmax      <- config$Gmax      
+  parallel  <- config$parallel   
+  stop      <- config$stop     
+  free_core <- config$free_core
   
   # Generate random mixture model parameters based on settings
   sim_para <- MixSim::MixSim(BarOmega = BO, K=TrueG, p=DD, PiLow = 0.1)
@@ -81,7 +96,15 @@ sim_NN <- function(NN_range, DD, BO, TrueG, LL, Gmax,
   return(structure(results, sim_para = sim_para))
 }
 
-repeat_sim <- function(sim, params, reps, save, name, parallel) {
+repeat_sim <- function(config) {
+  
+  sim       <- config$sim
+  reps      <- config$reps     
+  save      <- config$save      
+  name      <- config$name      
+  parallel  <- config$parallel 
+  free_core <- config$free_core
+  
   res <- list()
   
   if (parallel) {
@@ -95,16 +118,17 @@ repeat_sim <- function(sim, params, reps, save, name, parallel) {
     
     res <- foreach::foreach(
       i = 1:reps, .inorder = FALSE, .combine = combine_print_save,
-      .export = c("one_procedure", "one_g_step", 
-                  deparse(substitute(sim)))) %dopar% {
-        do.call(sim, params)
+      .export = c("one_procedure", "one_g_step", "config")) %dopar% {
+        sim(config)
       }
+    
+    stopCluster(cl)
     
   } else {
     
     for (i in 1:reps) {
       message(paste0("non-parallel: repeat_sim iteration ",i," of ",reps))
-      res[[i]] <- do.call(sim, params)
+      res[[i]] <- sim(config)
       if (save) {
         saveRDS(res, file = paste0(name,"_","res",i,".rds"))
       }
@@ -113,7 +137,7 @@ repeat_sim <- function(sim, params, reps, save, name, parallel) {
     
   results <- structure(
     res,
-    params = params,
+    config = config,
     reps = reps)
   if (save) {
     saveRDS(results, file = paste0(name,"_","results.rds"))
