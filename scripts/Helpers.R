@@ -1,4 +1,3 @@
-
 # Utilities ---------------------------------------------------------------
 load_packages <- Vectorize(function(package) {
   if (!require(package, character.only = T)) {
@@ -9,7 +8,7 @@ load_packages <- Vectorize(function(package) {
   return(T)
 })
 
-combine_print_save <- function (a, ...) {
+combine_print_save <- function(a, ...) {
   message("combining: ",length(a))
   saveRDS(a,file=paste0("result_backup",length(a),".rds"))
   c(a, list(...))
@@ -18,6 +17,18 @@ combine_print_save <- function (a, ...) {
 create_config <- function(...) {
   args <- list(...)
   c(Gmax = args$TrueG + args$Gextra, args)
+}
+
+# Assuming no more than 100 simultaneous jobs on SLURM
+save_results <- function(results) {
+  for (i in 1:100) {
+    file <- paste0("results",i,".rds")
+    if (!file.exists(file)) {
+      saveRDS(results, file = file)
+      return("Success")
+    }
+  }
+  error("Unable to continue saving results")
 }
 
 
@@ -56,11 +67,12 @@ one_procedure <- function(Sim_para, LL, NN, Gmax, stop) {
   Data2 <- MixSim::simdataset(n=NN,Pi=Sim_para$Pi,Mu=Sim_para$Mu,S=Sim_para$S)
   
   results <- matrix(NA, nrow = Gmax, ncol = 3)
+  
   if (stop) {
     GG <- 1
     repeat{
       results[GG, ] <- one_g_step(Data1, Data2, GG, LL)
-      if (all(results[GG,] >= 0.05) | GG > Gmax) { break }
+      if ( all(results[GG,] >= 0.05) | GG == Gmax) { break }
       GG <- GG + 1
     }
   } else {
@@ -108,6 +120,7 @@ repeat_sim <- function(config) {
   res <- list()
   
   if (parallel) {
+    
     # Activate cluster
     no_cores <- parallel::detectCores()
     if (free_core) {no_cores <- no_cores - 1}
@@ -116,9 +129,9 @@ repeat_sim <- function(config) {
     message(paste0("Num cores = ", no_cores,"\n"))
     print(cl)
     
-    res <- foreach::foreach(
-      i = 1:reps, .inorder = FALSE, .combine = combine_print_save,
-      .export = c("one_procedure", "one_g_step", "config")) %dopar% {
+    res <- foreach::foreach(i = 1:reps, 
+      .init = list(), .inorder = FALSE, .combine = combine_print_save,
+      .export = c("one_procedure", "one_g_step")) %dopar% {
         sim(config)
       }
     
