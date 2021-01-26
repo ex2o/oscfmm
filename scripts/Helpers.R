@@ -54,7 +54,7 @@ one_procedure <- function(Sim_para, LL, NN, Gmax, stop) {
     GG <- 1
     repeat{
       results[GG, ] <- one_g_step(Data1, Data2, GG, LL)
-      if (all(results[GG,] >= 0.05)) { break }
+      if (all(results[GG,] >= 0.05) | GG > Gmax) { break }
       GG <- GG + 1
     }
   } else {
