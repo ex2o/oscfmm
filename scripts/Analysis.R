@@ -32,7 +32,7 @@ config <- create_config(
   # force stop procedure when GG = TrueG + Gextra
   ,Gextra = 5   
   # if you experience trouble try setting parallel = FALSE
-  ,parallel = F     
+  ,parallel = T     
   # whether to stop on the first failure to reject
   ,stop_on_accept = T  
   # Whether to leave a free core for the OS
@@ -40,46 +40,47 @@ config <- create_config(
   # whether to save results
   ,save = T 
   # number of repetitions of the sim function for repeat_sim
-  ,reps = 1  
+  ,reps = 2  
   # A name string for saving
   ,name = ""           
 )
 
-results <- sim_recursive(config)
+results <- repeat_sim(config)
+
 save_results(results)
 #results <- readRDS("results.rds")
 
-# Reshape and combine results in long format
-fr <- results %>%
-  lapply(first_reject) %>% 
-  lapply(function(x){
-    df <- data.frame(do.call(rbind,x))
-    df$NN <- config$NN_range; df
-  }) %>% 
+# Reshape and combine results for first accept, in long format
+grid <- results %>% 
+  lapply(function(x){attr(x,"config")}) %>% 
+  do.call(rbind, .)
+res <- results %>% 
+  first_accept %>% 
   do.call(rbind, .) %>% 
-  (function(x){
-    x$run <- factor(rep(
-      1:length(results),each=length(config$NN_range))) 
-    x
-  })
+  data.frame() %>% 
+  set_names(c("p1","p2","p3"))
+res <- cbind(res,grid)
 
+
+# Plot --------------------------------------------------------------------
+tg <- 4 # Pick which TrueG to plot
+res_tg <- filter(res, TrueG == tg)
 
 # Add a quantile interval to the plot for each NN
-q <- fr %>% 
+res_tg_q <- res_tg %>% 
   group_by(NN) %>% 
-  mutate(X1_qL = quantile(X1, probs = 0.025),
-         X1_qU = quantile(X1, probs = 0.975),
-         X2_qL = quantile(X2, probs = 0.025),
-         X2_qU = quantile(X2, probs = 0.975),
-         X3_qL = quantile(X3, probs = 0.025),
-         X3_qU = quantile(X3, probs = 0.975),)
+  mutate(p1_qL = quantile(p1, probs = 0.025),
+         p1_qU = quantile(p1, probs = 0.975),
+         p2_qL = quantile(p2, probs = 0.025),
+         p2_qU = quantile(p2, probs = 0.975),
+         p3_qL = quantile(p3, probs = 0.025),
+         p3_qU = quantile(p3, probs = 0.975),)
 
-# Plot
 pdf(file="sim_NN.pdf",width=5,height=4)
-ggplot(data = fr, aes(x = NN, y = X3)) +
+ggplot(data = res_tg_q, aes(x = NN, y = p3)) +
   #geom_point() +
-  geom_jitter(col = "green") +
-  geom_errorbar(data = q, aes(ymin = X3_qL, ymax = X3_qU), 
+  geom_jitter(col = "green", height = 0.1, width = 5) +
+  geom_errorbar(aes(ymin = p3_qL, ymax = p3_qU), 
                 col = "blue", size = 1.1) +
   geom_hline(yintercept = 4, col = "red", 
              linetype="dashed", size = 1.1) +

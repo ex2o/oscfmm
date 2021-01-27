@@ -8,14 +8,17 @@ load_packages <- Vectorize(function(package) {
   return(T)
 })
 
-combine_print_save <- function(a, ...) {
-  message("combining: ",length(a))
-  saveRDS(a,file=paste0("result_backup",length(a),".rds"))
-  c(a, list(...))
+combiner <- function(a, ...) {
+  #message("combining: ",length(a))
+  #saveRDS(a,file=paste0("result_backup",length(a),".rds"))
+  #c(a, list(...))
+  c(a, ...)
 }
 
 create_config <- function(...) {
-  args <- list(...)
+  config <- list(...)
+  config$grids <- list(names(which(lapply(config, length) > 1)))
+  config
 }
 
 # Assuming no more than 100 simultaneous jobs on SLURM
@@ -88,7 +91,8 @@ one_procedure <- function(config, prev_results = list()) {
     }
   }
   
-  return(c(list(results), prev_results))  
+  return(c(prev_results, list(structure(
+    results, config = unlist(config[config$grids[[1]]])))))  
 }
 
 sim_recursive <- function(config, prev_results = list()) {
@@ -112,9 +116,48 @@ sim_recursive <- function(config, prev_results = list()) {
   return(results)
 }
 
+
+# Sim repetition functions ------------------------------------------------
+
+repeat_sim <- function(config) {
+  
+  results <- list()
+  
+  if (config$parallel) {
+    
+    # Activate cluster
+    no_cores <- parallel::detectCores()
+    if (config$free_core) {no_cores <- no_cores - 1}
+    doParallel::registerDoParallel(cores=no_cores)  
+    cl <- parallel::makeCluster(no_cores)  
+    message("Num cores = ", no_cores,"\n")
+    print(cl)
+    
+    export <-  c("sim_recursive","one_procedure", "one_g_step")
+    results <- foreach::foreach(
+      i = 1:config$reps 
+      ,.inorder = FALSE 
+      ,.combine = combiner, .init = list()
+      ,.export = export) %dopar% {
+        sim_recursive(config)
+      }
+    
+    stopCluster(cl)
+    
+  } else {
+    
+    for (i in 1:config$reps) {
+      results <- c(sim_recursive(config), results)
+    }
+  }
+  
+  results
+}
+
+
 # Summary functions -------------------------------------------------------
 
-first_reject <- function(res) {
+first_accept  <- function(res) {
   lapply(res, function(x){
     apply(x, MARGIN = 2, FUN = function(x){which(x>=0.05)[1]})
   })
