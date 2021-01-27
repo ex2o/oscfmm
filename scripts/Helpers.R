@@ -16,7 +16,6 @@ combine_print_save <- function(a, ...) {
 
 create_config <- function(...) {
   args <- list(...)
-  c(Gmax = args$TrueG + args$Gextra, args)
 }
 
 # Assuming no more than 100 simultaneous jobs on SLURM
@@ -58,103 +57,58 @@ one_g_step <- function(Data1, Data2, GG, LL) {
   return(c(P1,P2,P_bar))
 }
 
-one_procedure <- function(Sim_para, LL, NN, Gmax, stop) {
+one_procedure <- function(config, prev_results = list()) {
   
-  TrueG <- length(Sim_para$Pi)
+  Gmax <- config$TrueG + config$Gextra
+  
+  # Generate random mixture model parameters based on settings
+  sim_para <- MixSim::MixSim(
+    BarOmega = config$BO, K=config$TrueG, p=config$DD, PiLow = config$PiLow)
   
   # Generate two data sets of sizes n_1 = n_2
-  Data1 <- MixSim::simdataset(n=NN,Pi=Sim_para$Pi,Mu=Sim_para$Mu,S=Sim_para$S)
-  Data2 <- MixSim::simdataset(n=NN,Pi=Sim_para$Pi,Mu=Sim_para$Mu,S=Sim_para$S)
+  Data1 <- MixSim::simdataset(
+    n=config$NN, Pi=sim_para$Pi, Mu=sim_para$Mu, S=sim_para$S)
+  Data2 <- MixSim::simdataset(
+    n=config$NN, Pi=sim_para$Pi, Mu=sim_para$Mu, S=sim_para$S)
   
   results <- matrix(NA, nrow = Gmax, ncol = 3)
-  
-  if (stop) {
+  if (config$stop_on_accept) {
+    
     GG <- 1
     repeat{
-      results[GG, ] <- one_g_step(Data1, Data2, GG, LL)
+      results[GG, ] <- one_g_step(Data1, Data2, GG, config$LL)
       if ( all(results[GG,] >= 0.05) | GG == Gmax) { break }
       GG <- GG + 1
     }
   } else {
+    
     for (GG in 1:Gmax) {
-      cat("Testing g =",GG,"against g=",GG+LL,"\n")
-      results[GG, ] <- one_g_step(Data1, Data2, GG, LL)
+      cat("Testing g =",GG,"against g=",GG+config$LL,"\n")
+      results[GG, ] <- one_g_step(Data1, Data2, GG, config$LL)
     }
   }
   
-  return(results)  
+  return(c(list(results), prev_results))  
 }
 
-sim_NN <- function(config) {
+sim_recursive <- function(config, prev_results = list()) {
   
-  NN_range  <- config$NN_range   
-  DD        <- config$DD        
-  BO        <- config$BO        
-  TrueG     <- config$TrueG      
-  LL        <- config$LL        
-  Gmax      <- config$Gmax      
-  parallel  <- config$parallel   
-  stop      <- config$stop     
-  free_core <- config$free_core
-  
-  # Generate random mixture model parameters based on settings
-  sim_para <- MixSim::MixSim(BarOmega = BO, K=TrueG, p=DD, PiLow = 0.1)
-  
-  results <- list()
-  for(i in 1:length(NN_range)) {
-    results[[i]] <- one_procedure(sim_para, LL, NN_range[i], Gmax, stop)
-  }
-  
-  return(structure(results, sim_para = sim_para))
-}
-
-repeat_sim <- function(config) {
-  
-  sim       <- config$sim
-  reps      <- config$reps     
-  save      <- config$save      
-  name      <- config$name      
-  parallel  <- config$parallel 
-  free_core <- config$free_core
-  
-  res <- list()
-  
-  if (parallel) {
-    
-    # Activate cluster
-    no_cores <- parallel::detectCores()
-    if (free_core) {no_cores <- no_cores - 1}
-    doParallel::registerDoParallel(cores=no_cores)  
-    cl <- parallel::makeCluster(no_cores)  
-    message(paste0("Num cores = ", no_cores,"\n"))
-    print(cl)
-    
-    res <- foreach::foreach(i = 1:reps, 
-      .init = list(), .inorder = FALSE, .combine = combine_print_save,
-      .export = c("one_procedure", "one_g_step")) %dopar% {
-        sim(config)
-      }
-    
-    stopCluster(cl)
-    
+  grids <- which(lapply(config, length) > 1)
+  if (length(grids) == 1) {
+    next_sim <- one_procedure
   } else {
-    
-    for (i in 1:reps) {
-      message(paste0("non-parallel: repeat_sim iteration ",i," of ",reps))
-      res[[i]] <- sim(config)
-      if (save) {
-        saveRDS(res, file = paste0(name,"_","res",i,".rds"))
-      }
-    }
+    next_sim <- sim_recursive
   }
+  
+  next_grid <- config[[grids[1]]]
+  results <- prev_results
+  for( x in next_grid ) {
     
-  results <- structure(
-    res,
-    config = config,
-    reps = reps)
-  if (save) {
-    saveRDS(results, file = paste0(name,"_","results.rds"))
+    configx <- config
+    configx[[grids[1]]] <- x
+    results <- next_sim(configx, results)
   }
+  
   return(results)
 }
 

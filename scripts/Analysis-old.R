@@ -14,38 +14,26 @@ packages <- c("mclust",
               "dplyr")
 load_packages(packages)
 
-# The simulation is chosen based on whatever variables in the config
-# are of length > 1.
+# The simulation is chosen based on whatever variable in the config
+# is of length > 1 (provided the sim has been implemented).
 config <- create_config(
-  # n_1 (n_2) or n/2 sample size      
-  NN = c(100,200,300)  #c(100,200,300) #c(seq(100,1000,by=100), seq(1500,3000,by=500), 4000, 5000)
-  # dimension of mixture model
-  ,DD = 2   
-  # difference in mixtures for MixSim function
-  ,BO = c(0.05,0.2) 
-  # generative number of components
-  ,TrueG = c(4,5)      
-  # lower bound for mixing proportions
-  ,PiLow = 0.1   
-  # additional components in alternative
-  ,LL = 1      
-  # force stop procedure when GG = TrueG + Gextra
-  ,Gextra = 5   
-  # if you experience trouble try setting parallel = FALSE
-  ,parallel = F     
-  # whether to stop on the first failure to reject
-  ,stop_on_accept = T  
-  # Whether to leave a free core for the OS
-  ,free_core = T  
-  # whether to save results
-  ,save = T 
-  # number of repetitions of the sim function for repeat_sim
-  ,reps = 1  
-  # A name string for saving
-  ,name = ""           
+ # ,NN = 2000        # n_1 (n_2) or n/2 sample size
+  NN = 100 #c(100,200,300) #c(seq(100,1000,by=100), seq(1500,3000,by=500), 4000, 5000)
+ ,DD = 2           # dimension of mixture model
+ ,BO = 0.05 #c(0.05,0.2) # difference in mixtures for MixSim function
+ ,TrueG = c(4,5)   # generative number of components
+ ,PiLow = 0.1      # lower bound for mixing proportions
+ ,LL = 1           # additional components in alternative
+ ,Gextra = 5       # force stop procedure when GG = TrueG + Gextra
+ ,parallel = F     # if you experience trouble try setting parallel = FALSE
+ ,stop = T         # whether to stop on the first failure to reject
+ ,free_core = T    # Whether to leave a free core for the OS
+ ,save = T         # whether to save results
+ ,reps = 1         # number of repetitions of the sim function for repeat_sim
+ ,name = ""        # A name string for saving
 )
 
-results <- sim_recursive(config)
+results <- repeat_sim(config)
 save_results(results)
 #results <- readRDS("results.rds")
 
