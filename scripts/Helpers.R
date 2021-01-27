@@ -119,7 +119,7 @@ sim_recursive <- function(config, prev_results = list()) {
 
 # Sim repetition functions ------------------------------------------------
 
-repeat_sim <- function(config) {
+repeat_sim <- function(config, sim) {
   
   results <- list()
   
@@ -139,7 +139,7 @@ repeat_sim <- function(config) {
       ,.inorder = FALSE 
       ,.combine = combiner, .init = list()
       ,.export = export) %dopar% {
-        sim_recursive(config)
+        sim(config)
       }
     
     stopCluster(cl)
@@ -147,7 +147,7 @@ repeat_sim <- function(config) {
   } else {
     
     for (i in 1:config$reps) {
-      results <- c(sim_recursive(config), results)
+      results <- c(sim(config), results)
     }
   }
   

@@ -45,7 +45,7 @@ config <- create_config(
   ,name = ""           
 )
 
-results <- repeat_sim(config)
+results <- repeat_sim(config, sim_recursive)
 
 save_results(results)
 #results <- readRDS("results.rds")
