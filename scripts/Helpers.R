@@ -118,7 +118,7 @@ one_procedure <- function(config, prev_results = list()) {
 sim_recursive <- function(config, prev_results = list()) {
   
   if (config$verbose) {
-    cat("Went one deeper at",Sys.time(),"with length(prev_results) = ",
+    cat("Went one deeper at",date(),"with length(prev_results) = ",
         length(prev_results),"\n")}
   
   grids <- which(lapply(config, length) > 1)
@@ -138,7 +138,7 @@ sim_recursive <- function(config, prev_results = list()) {
   }
   
   if (config$verbose) {
-    cat("Unwound a layer at",Sys.time(),"with length(prev_results) = ",
+    cat("Unwound a layer at",date(),"with length(prev_results) = ",
         length(prev_results),"\n")}
   
   return(results)
