@@ -18,6 +18,7 @@ combiner <- function(a, ...) {
 create_config <- function(...) {
   config <- list(...)
   config$grids <- list(names(which(lapply(config, length) > 1)))
+  visualise_config(config)
   config
 }
 
@@ -33,17 +34,36 @@ save_results <- function(results) {
   error("Unable to continue saving results")
 }
 
+# only works if config has no grids
+visualise_config <- function(config) {
+  ngrids <- length(config$grids[[1]])
+  if(ngrids != 0) {
+    return(F)
+  }
+  
+  # Generate random mixture model parameters based on settings
+  Sim_para <- MixSim(BarOmega = config$BO, K=config$TrueG, p=config$DD, 
+                     PiLow = config$PiLow)
+  
+  # Generate example data
+  Data <- simdataset(n=config$NN,Pi=Sim_para$Pi,Mu=Sim_para$Mu,S=Sim_para$S)
+  
+  plot(Data$X, col = Data$id)
+  
+  return(T)
+}
+
 
 # Sim functions -----------------------------------------------------------
 
 one_g_step <- function(Data1, Data2, GG, LL) {
   # Fit mixtures under null hypothesis
-  MC1_null <- mclust::densityMclust(Data1$X,G=GG,modelNames = 'VVV')
-  MC2_null <- mclust::densityMclust(Data2$X,G=GG,modelNames = 'VVV')
+  MC1_null <- mclust::densityMclust(Data1$X,G=GG,modelNames = 'VVV',verbose=F)
+  MC2_null <- mclust::densityMclust(Data2$X,G=GG,modelNames = 'VVV',verbose=F)
   
   # Fit mixtures under the alternative hypothesis
-  MC1_alt <- mclust::densityMclust(Data1$X,G=GG+LL,modelNames = 'VVV')
-  MC2_alt <- mclust::densityMclust(Data2$X,G=GG+LL,modelNames = 'VVV')
+  MC1_alt <- mclust::densityMclust(Data1$X,G=GG+LL,modelNames = 'VVV',verbose=F)
+  MC2_alt <- mclust::densityMclust(Data2$X,G=GG+LL,modelNames = 'VVV',verbose=F)
   
   # Calculate test statistics
   V1 <- exp(sum(log(
@@ -97,6 +117,10 @@ one_procedure <- function(config, prev_results = list()) {
 
 sim_recursive <- function(config, prev_results = list()) {
   
+  if (config$verbose) {
+    cat("Went one deeper at",Sys.time(),"with length(prev_results) = ",
+        length(prev_results),"\n")}
+  
   grids <- which(lapply(config, length) > 1)
   if (length(grids) == 1) {
     next_sim <- one_procedure
@@ -113,6 +137,10 @@ sim_recursive <- function(config, prev_results = list()) {
     results <- next_sim(configx, results)
   }
   
+  if (config$verbose) {
+    cat("Unwound a layer at",Sys.time(),"with length(prev_results) = ",
+        length(prev_results),"\n")}
+  
   return(results)
 }
 
@@ -124,23 +152,33 @@ repeat_sim <- function(config, sim) {
   results <- list()
   
   if (config$parallel) {
+  
+    # Prepare foreach loop arguments
+    foreach_config <- list(
+      i = 1:config$reps 
+      ,.inorder = FALSE 
+      ,.combine = combiner, .init = list()
+      ,.export = c("sim_recursive","one_procedure", "one_g_step")
+    )
     
     # Activate cluster
     no_cores <- parallel::detectCores()
     if (config$free_core) {no_cores <- no_cores - 1}
-    doParallel::registerDoParallel(cores=no_cores)  
-    cl <- parallel::makeCluster(no_cores)  
+    doParallel::registerDoParallel(cores=no_cores)
+    if (config$verbose) {
+      foreach_config$.verbose = T
+      cl <- parallel::makeCluster(no_cores, outfile = "foreach_log.txt")
+    } else {
+      cl <- parallel::makeCluster(no_cores)
+    }
+      
     message("Num cores = ", no_cores,"\n")
     print(cl)
-    
-    export <-  c("sim_recursive","one_procedure", "one_g_step")
-    results <- foreach::foreach(
-      i = 1:config$reps 
-      ,.inorder = FALSE 
-      ,.combine = combiner, .init = list()
-      ,.export = export) %dopar% {
+
+    # (parallel) foreach loop
+    results <- do.call(foreach::foreach, foreach_config) %dopar% {
         sim(config)
-      }
+    }
     
     stopCluster(cl)
     
@@ -151,7 +189,7 @@ repeat_sim <- function(config, sim) {
     }
   }
   
-  results
+  structure(results, config = config)
 }
 
 
