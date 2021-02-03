@@ -19,23 +19,32 @@ load_packages(packages)
 
 # The simulation is chosen based on whatever variables in the config
 # are of length > 1.
-# If config is created with no grids then a quick visualisation of the
+## **** Note **** 
+# If config is created with no grids 
+# then a quick visualisation of the
 # mixture is produced.
+## **************
 config <- create_config(
   # n_1 (n_2) or n/2 sample size      
-  NN = c(100,200,300) #c(seq(100,1000,by=100), seq(1500,3000,by=500), 4000, 5000)
+  NN = 1500 #seq(500,1500,by=500)
   # dimension of mixture model
-  ,DD = 2   
-  # difference in mixtures for MixSim function
-  ,BO = 0.05 #seq(0.025, 0.1, by=0.025)
+  ,DD = c(2,4)   
+  # value of desired average overlap for MixSim function (can be NULL)
+  ,BO = c(0.001,0.01,0.05)
+  # value of desired maximum overlap for MixSim function (can be NULL)
+  #,MO = c(0.001,0.01,0.05)
   # generative number of components
-  ,TrueG = 4:5 #seq(2, 8, by=2)     
+  ,TrueG = c(5,10)  
   # lower bound for mixing proportions
   ,PiLow = 0.1   
   # additional components in alternative
-  ,LL = 1      
+  ,LL = c(1,2)      
+  # covariance matrix structure (FALSE = non-spherical, TRUE = spherical).
+  ,sph = F
   # force stop procedure when GG = TrueG + Gextra
-  ,Gextra = 5   
+  ,Gextra = 5  
+  # error bound for overlap computation (default).
+  ,eps = 1e-03
   # if you experience trouble try setting parallel = FALSE
   ,parallel = F     
   # whether to stop on the first failure to reject
@@ -45,21 +54,29 @@ config <- create_config(
   # whether to save results
   ,save = T 
   # number of repetitions of the sim function for repeat_sim
-  ,reps = 3  
+  ,reps = 2  
   # A name string for saving
   ,name = ""
   # whether to print diagnostic messages
   ,verbose= T
 )
 
-results <- repeat_sim(config, sim_recursive)
+#config <- test_config
+
+# sim_recursive suits simulations where the procedure is 
+# much more computationally intensive than switching between grid points
+t <- system.time({
+  results <- repeat_sim(config, sim_recursive)
+})
+cat("User time = ", t[1],"s")
 
 save_results(results)
+
 results <- readRDS("results1.rds")
 
 # Reshape and combine results for first accept, in long format
 grid <- results %>% 
-  lapply(function(x){attr(x,"config")}) %>% 
+  lapply(function(x){attr(x,"grid_pos")}) %>% 
   do.call(rbind, .)
 res <- results %>% 
   first_accept %>% 
@@ -105,3 +122,41 @@ dev.off()
 # Plot 2 ------------------------------------------------------------------
 
 
+
+
+# Test config -------------------------------------------------------------
+
+test_config <- create_config(
+  # n_1 (n_2) or n/2 sample size      
+  NN = c(500,500) #c(seq(500, 1000, by=100), seq(1500,3000,by=500), 4000, 5000)
+  # dimension of mixture model
+  ,DD = 2 #c(2,4)   
+  # value of desired average overlap for MixSim function (can be NULL)
+  ,BO = 0.001 #c(0.001,0.01,0.05)
+  # value of desired maximum overlap for MixSim function (can be NULL)
+  #,MO = 0.15
+  # generative number of components
+  ,TrueG = 5 #c(5,10)  
+  # lower bound for mixing proportions
+  ,PiLow = 0.1   
+  # additional components in alternative
+  ,LL = 1 #c(1,2)      
+  # force stop procedure when GG = TrueG + Gextra
+  ,Gextra = 5  
+  # error bound for overlap computation (default).
+  ,eps = 1e-03
+  # if you experience trouble try setting parallel = FALSE
+  ,parallel = F     
+  # whether to stop on the first failure to reject
+  ,stop_on_accept = T  
+  # Whether to leave a free core for the OS
+  ,free_core = T  
+  # whether to save results
+  ,save = T 
+  # number of repetitions of the sim function for repeat_sim
+  ,reps = 3  
+  # A name string for saving
+  ,name = ""
+  # whether to print diagnostic messages
+  ,verbose= T
+)

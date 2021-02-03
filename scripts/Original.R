@@ -1,9 +1,9 @@
 library(mclust)
 library(MixSim)
 
-NN <- 2000 # n_1 (n_2) or n/2 sample size
+NN <- 100 # n_1 (n_2) or n/2 sample size
 DD <- 2 # Dimension of mixture model
-BO <- 0.2 # Difference in mixtures for MixSim function
+BO <- 0.05 # Difference in mixtures for MixSim function
 TrueG <- 4 # Generative number of components
 
 # Generate random mixture model parameters based on settings

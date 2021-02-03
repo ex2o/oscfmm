@@ -12,19 +12,22 @@ combiner <- function(a, ...) {
   #message("combining: ",length(a))
   #saveRDS(a,file=paste0("result_backup",length(a),".rds"))
   #c(a, list(...))
-  c(a, ...)
+  b <- c(a, ...)
+  save_results(b)
+  b
 }
 
 create_config <- function(...) {
   config <- list(...)
   config$grids <- list(names(which(lapply(config, length) > 1)))
+  config$modelNames <- if ( config$sph ) {"VII"} else {"VVV"}
   visualise_config(config)
   config
 }
 
 # Assuming no more than 100 simultaneous jobs on SLURM
 save_results <- function(results) {
-  for (i in 1:100) {
+  for (i in 1:1000) {
     file <- paste0("results",i,".rds")
     if (!file.exists(file)) {
       saveRDS(results, file = file)
@@ -42,13 +45,19 @@ visualise_config <- function(config) {
   }
   
   # Generate random mixture model parameters based on settings
-  Sim_para <- MixSim(BarOmega = config$BO, K=config$TrueG, p=config$DD, 
-                     PiLow = config$PiLow)
+  sim_para <- MixSim::MixSim(
+    BarOmega = config$BO, MaxOmega=config$MO, 
+    eps=config$eps, sph=config$sph,
+    K=config$TrueG, p=config$DD, PiLow = config$PiLow)
   
-  # Generate example data
-  Data <- simdataset(n=config$NN,Pi=Sim_para$Pi,Mu=Sim_para$Mu,S=Sim_para$S)
+  # Parallel distribution plot
+  pdplot(Pi = sim_para$Pi, Mu = sim_para$Mu, S = sim_para$S)
   
+  # Plot example data
+  Data <- simdataset(
+    n=config$NN,Pi=sim_para$Pi,Mu=sim_para$Mu,S=sim_para$S)
   plot(Data$X, col = Data$id)
+  
   
   return(T)
 }
@@ -57,13 +66,18 @@ visualise_config <- function(config) {
 # Sim functions -----------------------------------------------------------
 
 one_g_step <- function(Data1, Data2, GG, LL) {
+  
   # Fit mixtures under null hypothesis
-  MC1_null <- mclust::densityMclust(Data1$X,G=GG,modelNames = 'VVV',verbose=F)
-  MC2_null <- mclust::densityMclust(Data2$X,G=GG,modelNames = 'VVV',verbose=F)
+  MC1_null <- mclust::densityMclust(
+    Data1$X,G=GG,modelNames=config$modelNames,verbose=F)
+  MC2_null <- mclust::densityMclust(
+    Data2$X,G=GG,modelNames=config$modelNames,verbose=F)
   
   # Fit mixtures under the alternative hypothesis
-  MC1_alt <- mclust::densityMclust(Data1$X,G=GG+LL,modelNames = 'VVV',verbose=F)
-  MC2_alt <- mclust::densityMclust(Data2$X,G=GG+LL,modelNames = 'VVV',verbose=F)
+  MC1_alt <- mclust::densityMclust(
+    Data1$X,G=GG+LL,modelNames=config$modelNames,verbose=F)
+  MC2_alt <- mclust::densityMclust(
+    Data2$X,G=GG+LL,modelNames=config$modelNames,verbose=F)
   
   # Calculate test statistics
   V1 <- exp(sum(log(
@@ -86,7 +100,9 @@ one_procedure <- function(config, prev_results = list()) {
   
   # Generate random mixture model parameters based on settings
   sim_para <- MixSim::MixSim(
-    BarOmega = config$BO, K=config$TrueG, p=config$DD, PiLow = config$PiLow)
+    BarOmega = config$BO, MaxOmega=config$MO, 
+    eps=config$eps, sph=config$sph,
+    K=config$TrueG, p=config$DD, PiLow = config$PiLow)
   
   # Generate two data sets of sizes n_1 = n_2
   Data1 <- MixSim::simdataset(
@@ -94,34 +110,55 @@ one_procedure <- function(config, prev_results = list()) {
   Data2 <- MixSim::simdataset(
     n=config$NN, Pi=sim_para$Pi, Mu=sim_para$Mu, S=sim_para$S)
   
+  grid_pos <- unlist(config[config$grids[[1]]])
+  if (config$verbose) {
+    cat("*** Begin procedure at grid_pos: ",
+        paste0(names(grid_pos),"=",grid_pos),
+        " ***\n")
+  }
+  
   results <- matrix(NA, nrow = Gmax, ncol = 3)
   if (config$stop_on_accept) {
     
     GG <- 1
     repeat{
-      results[GG, ] <- one_g_step(Data1, Data2, GG, config$LL)
-      if ( all(results[GG,] >= 0.05) | GG == Gmax) { break }
+      if (config$verbose) {
+        cat("Testing g =",GG,"against g=",GG+config$LL,"at",date(),"\n")
+      }
+      results[GG, ] <- tryCatch(
+        one_g_step(Data1, Data2, GG, config$LL)
+       ,error=function(e){
+          message(e$message)
+          return(-999)})
+      if ( all(results[GG,] < 0) | all(results[GG,] >= 0.05) | GG == Gmax) { 
+        break }
       GG <- GG + 1
     }
   } else {
     
     for (GG in 1:Gmax) {
-      cat("Testing g =",GG,"against g=",GG+config$LL,"\n")
+      if (config$verbose) {
+        cat("Testing g =",GG,"against g=",GG+config$LL,"at",date(),"\n")
+      }
       results[GG, ] <- one_g_step(Data1, Data2, GG, config$LL)
     }
   }
-  
-  return(c(prev_results, list(structure(
-    results, config = unlist(config[config$grids[[1]]])))))  
+
+  return(c(prev_results, list(
+    structure(
+      results, 
+      grid_pos = grid_pos,
+      sim_para = sim_para
+    ))
+  ))  
 }
 
 sim_recursive <- function(config, prev_results = list()) {
   
-  if (config$verbose) {
-    cat("Went one deeper at",date(),"with length(prev_results) = ",
-        length(prev_results),"\n")}
-  
   grids <- which(lapply(config, length) > 1)
+  
+  if(length(grids) == 0) {stop("sim_recursive needs at least one grid")}
+  
   if (length(grids) == 1) {
     next_sim <- one_procedure
   } else {
@@ -129,6 +166,12 @@ sim_recursive <- function(config, prev_results = list()) {
   }
   
   next_grid <- config[[grids[1]]]
+  
+  if (config$verbose) {
+    cat("Entered grid",names(config[grids[1]]),"at",date(),
+        "with length(prev_results) = ",
+        length(prev_results),"\n")}
+  
   results <- prev_results
   for( x in next_grid ) {
     
@@ -138,7 +181,8 @@ sim_recursive <- function(config, prev_results = list()) {
   }
   
   if (config$verbose) {
-    cat("Unwound a layer at",date(),"with length(prev_results) = ",
+    cat("Unwound grid",names(config[grids[1]]),"at",date(),
+        "with length(prev_results) = ",
         length(prev_results),"\n")}
   
   return(results)
@@ -185,7 +229,13 @@ repeat_sim <- function(config, sim) {
   } else {
     
     for (i in 1:config$reps) {
+      if (config$verbose) {
+        cat("-----------------------------------------------\n")
+        cat("simulation",i,"of",config$reps,"at",date(),"\n")
+        cat("-----------------------------------------------\n")
+      }
       results <- c(sim(config), results)
+      save_results(structure(results, config = config))
     }
   }
   
