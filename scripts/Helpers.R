@@ -21,7 +21,13 @@ create_config <- function(...) {
   config <- list(...)
   config$grids <- list(names(which(lapply(config, length) > 1)))
   config$modelNames <- if ( config$sph ) {"VII"} else {"VVV"}
-  visualise_config(config)
+  if (config$fixed_paras) {
+    config$sim_para <- MixSim::MixSim(
+      BarOmega=config$BO, MaxOmega=config$MO, 
+      eps=config$eps, sph=config$sph,
+      K=config$TrueG, p=config$DD, PiLow = config$PiLow)
+    visualise_config(config)
+  }
   config
 }
 
@@ -45,13 +51,10 @@ visualise_config <- function(config) {
   }
   
   # Generate random mixture model parameters based on settings
-  sim_para <- MixSim::MixSim(
-    BarOmega = config$BO, MaxOmega=config$MO, 
-    eps=config$eps, sph=config$sph,
-    K=config$TrueG, p=config$DD, PiLow = config$PiLow)
+  sim_para <- config$sim_para
   
   # Parallel distribution plot
-  pdplot(Pi = sim_para$Pi, Mu = sim_para$Mu, S = sim_para$S)
+  pdplot(Pi=sim_para$Pi, Mu=sim_para$Mu, S=sim_para$S)
   
   # Plot example data
   Data <- simdataset(
@@ -98,11 +101,15 @@ one_procedure <- function(config, prev_results = list()) {
   
   Gmax <- config$TrueG + config$Gextra
   
-  # Generate random mixture model parameters based on settings
-  sim_para <- MixSim::MixSim(
-    BarOmega = config$BO, MaxOmega=config$MO, 
-    eps=config$eps, sph=config$sph,
-    K=config$TrueG, p=config$DD, PiLow = config$PiLow)
+  if (!config$fixed_paras) {
+    # Generate random mixture model parameters based on settings
+    sim_para <- MixSim::MixSim(
+      BarOmega=config$BO, MaxOmega=config$MO, 
+      eps=config$eps, sph=config$sph,
+      K=config$TrueG, p=config$DD, PiLow = config$PiLow)
+  } else {
+    sim_para <- config$sim_para
+  }
   
   # Generate two data sets of sizes n_1 = n_2
   Data1 <- MixSim::simdataset(
@@ -247,6 +254,7 @@ repeat_sim <- function(config, sim) {
 
 first_accept  <- function(res) {
   lapply(res, function(x){
+    if (any(x < -99, na.rm = T)) {return(NA)}
     apply(x, MARGIN = 2, FUN = function(x){which(x>=0.05)[1]})
   })
 }
