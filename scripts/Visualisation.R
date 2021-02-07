@@ -1,15 +1,7 @@
 results <- readRDS("../results/local/sim_recursive/results_9529835.rds")
 
-# Reshape and combine results for first accept, in long format
-grid <- results %>% 
-  lapply(function(x){attr(x,"grid_pos")}) %>% 
-  do.call(rbind, .)
-res <- results %>% 
-  first_accept %>% 
-  do.call(rbind, .) %>% 
-  data.frame() %>% 
-  set_names(c("p1","p2","p3"))
-res <- cbind(res,grid)
+
+res <- combine_first_accepts(results)
 
 # Look at NA frequency
 length(res$p1)
@@ -38,15 +30,8 @@ sum(res1$p3 > 5, na.rm = T)
 tg <- 5 # Pick which TrueG to plot
 res_tg <- filter(res, TrueG == tg)
 
-# Add a quantile interval to the plot for each NN
-res_tg_q <- res_tg %>% 
-  group_by(NN) %>% 
-  mutate(p1_qL = quantile(p1, probs = 0.025)
-         ,p1_qU = quantile(p1, probs = 0.975)
-         ,p2_qL = quantile(p2, probs = 0.025)
-         ,p2_qU = quantile(p2, probs = 0.975)
-         ,p3_qL = quantile(p3, probs = 0.025)
-         ,p3_qU = quantile(p3, probs = 0.975))
+# Add a quantile interval for each grid point
+res_tg_q <- add_quantiles(res)
 
 pdf(file="sim_NN.pdf",width=5,height=4)
 ggplot(data = res_tg_q, aes(x = NN, y = p3)) +

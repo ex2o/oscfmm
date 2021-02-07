@@ -22,16 +22,10 @@ load_packages(packages)
 source("test_config.R") 
 #source("main_config.R")
 
-# one_procedure is useful for any simulation with no grids (just repetitions)
 t <- system.time({
-  repeat_sim(config, one_procedure)
+  results <- simulation(config)
 })
 
-# sim_recursive suits simulations where the procedure is 
-# much more computationally intensive than switching between grid points
-t <- system.time({
-  results <- repeat_sim(config, sim_recursive)
-})
 cat("User time = ", t[1],"s")
 
 save_results(results)
