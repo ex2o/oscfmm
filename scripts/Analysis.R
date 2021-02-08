@@ -13,7 +13,8 @@ packages <- c("mclust",
               "foreach",
               "magrittr",
               "ggplot2",
-              "dplyr")
+              "dplyr",
+              "tidyr")
 load_packages(packages)
 
 ### Choose config script:

@@ -40,11 +40,11 @@ ds_grid <- expand.grid(
 
 config <- create_config(
   # number of draws of random parameters from MixSim
-   ms_draws=1
+  ms_draws=1
   # number of draws of random datasets from simdataset
   ,ds_draws=2
   # whether to parallelise (at the level of ms_draws only)
-  ,parallel=T  
+  ,parallel=F  
   # MixSim parameter grid
   ,ms_grid=ms_grid
   # Dataset Simulation grid
