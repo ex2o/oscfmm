@@ -1,3 +1,0 @@
-library(mclust)
-library(MixSim)
-

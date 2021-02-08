@@ -4,22 +4,31 @@
 
 # Basic grid positions:
 ms_grid <- expand.grid(
+  
   # dimension of mixture model
   DD=c(2,4)   
+  
   # value of desired average overlap for MixSim function (can be NULL)
   ,BO=c(0.001,0.01,0.05)
+  
   # value of desired maximum overlap for MixSim function (can be NULL)
   #,MO=c(0.001,0.01,0.05)
+  
   # generative number of components
   ,TrueG=c(5,10)  
+  
   # error bound for overlap computation (default).
   ,eps=1e-03
+  
 )
 
 # Parameters defined in terms of basic grid positions:
 ms_grid <- mutate(ms_grid
-                  # lower bound for mixing proportions
-                  ,PiLow = 1/(2*TrueG))
+                  
+  # lower bound for mixing proportions
+  ,PiLow = 1/(2*TrueG)
+  
+)
 
 
 # ***************** Data Simulation grid ********************
@@ -28,10 +37,13 @@ ms_grid <- mutate(ms_grid
 # for each row of ms_grid
 
 ds_grid <- expand.grid(
+  
   # n_1 (n_2) or n/2 sample size      
   NN=seq(1000,3000,by=1000)
+  
   # additional components in alternative
   ,LL=c(1,2) 
+  
 )
 
 
@@ -39,39 +51,40 @@ ds_grid <- expand.grid(
 # Each config parameter is unchanged for the entire simulation
 
 config <- create_config(
-  # number of draws of random parameters from MixSim
-  ms_draws=11
+  
+  # number of draws of random parameters from MixSim (NULL is automatic)
+  ms_draws=NULL
+  
   # number of draws of random datasets from simdataset
   ,ds_draws=100
+  
   # whether to parallelise (at the level of ms_draws only)
   ,parallel=T  
+  
   # MixSim parameter grid
   ,ms_grid=ms_grid
+  
   # Dataset Simulation grid
   ,ds_grid=ds_grid
+  
   # force stop procedure when GG = TrueG + Gextra
   ,Gextra=5  
+  
   # whether to use fixed MixSim params wherever possible
   ,fixed_paras=T
+  
   # whether to stop on the first failure to reject
   ,stop_on_accept=T  
+  
   # Whether to leave a free core for the OS
   ,free_core=T  
-  # whether to save results
-  ,save=T
+  
   # whether to print diagnostic messages
   ,verbose= T
+  
   # covariance matrix structure (FALSE = non-spherical, TRUE = spherical).
   ,sph=F
+  
 )
 
 rm(list = c("ms_grid", "ds_grid"))
-
-
-# The simulation is chosen based on whatever variables in the config
-# are of length > 1.
-# **** Note **** 
-# If config is created with no grids 
-# then a quick visualisation of the
-# mixture is produced.
-# **************

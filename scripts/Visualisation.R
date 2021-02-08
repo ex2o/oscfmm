@@ -1,26 +1,39 @@
-results <- readRDS("../results/local/sim_recursive/results_9529835.rds")
+#results <- readRDS("../results/local/sim_recursive/results_9529835.rds")
+
+results <- readRDS("results1.rds")
 
 
+# Remove errors and check error rate
+errd <- errored(results)
+sum(errd)/length(results)
+results <- results[!errd]
+
+# combine first accepts into a table
 res <- combine_first_accepts(results)
 
-# Look at NA frequency
-length(res$p1)
-sum(is.na(res$p1[res$BO == 0.001]))
-
-# Remove errors and look at error rate
+# Remove NAs and look at NA rate
 res0 <- res %>% drop_na()
 (1 - nrow(res0)/nrow(res))
 
 # Subset the results
 res1 <- res0 %>% filter(
-  BO != 0.001
-  ,LL == 1
-  ,TrueG == 5
-  ,DD == 2
-  ,NN == 500)
+  BO == 0.01
+ ,LL == 1
+ ,TrueG == 5
+ ,DD == 2
+ ,NN == 500
+)
+
+# Look at sample size
+nrow(res1)
+
+# Look at sample ratio
+nrow(res1)/nrow(res0)
 
 # Look at fail rate
-sum(res1$p3 > 5)/nrow(res0)
+sum(res1$p1 > 5)/nrow(res1)
+sum(res1$p2 > 5)/nrow(res1)
+sum(res1$p3 > 5)/nrow(res1)
 
 # Plot 1 ------------------------------------------------------------------
 #
