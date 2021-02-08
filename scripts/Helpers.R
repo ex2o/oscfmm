@@ -35,6 +35,7 @@ create_config <- function(...) {
   
   config <- prepare_for_slurm_array(config)
   
+  config
 }
 
 prepare_parallel <- function(config) {
@@ -86,8 +87,14 @@ prepare_cluster <- function(config) {
     i = 1:config$ms_draws
     ,.inorder = FALSE
     ,.combine = combiner, .init = list()
-    ,.export = c("one_mixture_grid","one_procedure", "one_g_step",
-                 "retry_on_error", "mixsim", "simdata","worker")
+    ,.export = c("one_mixture_grid",
+                 "one_procedure", 
+                 "one_g_step",
+                 "retry_on_error", 
+                 "mixsim", 
+                 "simdata",
+                 "worker",
+                 "is_there_time")
   )
   
   # Activate the cluster
@@ -118,14 +125,16 @@ prepare_for_slurm_array <- function(config) {
     config$slurm_task_id <- as.numeric(Sys.getenv('SLURM_ARRAY_TASK_ID'))
     
     if (!is.na(config$slurm_task_id)) {
-      cat("slurm job, task id: ", config$slurm_task_id)
+      cat("slurm array job, task id: ", config$slurm_task_id)
     } else {
-      stop("no slurm task id was found")
+      stop("slurm array job but no slurm task id was found")
     }
     
     all_NN <- config$ds_grid$NN
     this_NN <- unique(all_NN)[config$slurm_task_id]
     config$ds_grid <- config$ds_grid[all_NN == this_NN,]
+
+    cat("this task uses NN=",this_NN,"\n")
     
   } else {
     
@@ -148,7 +157,7 @@ prepare_model_names <- function(config) {
 
 
 # Assuming no more than 100 simultaneous jobs on SLURM
-save_results <- function(results) {
+save_results <- function(results,slurm_task_id) {
   
   for (i in 1:1000) {
     file <- paste0("results",i,"_",slurm_task_id,".rds")
@@ -193,11 +202,29 @@ retry_on_error <- function(
                      attempts, 
                      max_errors, 
                      retval[1])
+      if (!is.null(config)) {
+        if (config$verbose) {
+          cat(">>>>>>>>>> errored <<<<<<<<<< at", date(),"on",worker(),"\n")
+        }
+      }
       warning(msg)
     }
     retval <- try(eval(expr))
   }
   return(structure(retval, attempts = attempts))
+}
+
+is_there_time <- function(config) {
+  
+  elapsed <- difftime(Sys.time(), config$start_time, units = "secs")[[1]]
+  if(elapsed > config$max_elapsed) {
+    answer <- FALSE
+  } else {
+    answer <- TRUE
+  }
+  
+  config$there_is_time <- structure(answer, elapsed=elapsed)
+  config
 }
 
 mixsim <- function(config) {
@@ -271,10 +298,16 @@ one_procedure <- function(config, prev_results = list()) {
     cat("*** Begin procedure ***","on",worker(),"\n")
   }
   
-  Gmax <- config$ms_grid_point$TrueG + config$Gextra
-  results <- matrix(NA, nrow=Gmax, ncol=3)
+  config$Gmax <- config$ms_grid_point$TrueG + config$Gextra
+  
+  # Check that enough time remains to execute another procedure.
+  
+  config <- is_there_time(config)
+  
   GG <- 1
-  repeat{
+  results <- matrix(NA, nrow=config$Gmax, ncol=3)
+  while(config$there_is_time){
+    
     if (config$verbose) {
       cat("Testing g =", GG, "against g =", 
           GG+config$ds_grid_point$LL, "at", date(),"on",worker(),"\n")
@@ -284,7 +317,7 @@ one_procedure <- function(config, prev_results = list()) {
         one_g_step(Data1, Data2, GG, config$ds_grid_point$LL)
       }, max_errors=2, no_error=F)
     
-    check <- all(results[GG,] >= 0.05) | (GG == Gmax)
+    check <- all(results[GG,] >= 0.05) | (GG == config$Gmax)
     if (check) { break }
     GG <- GG + 1
   }
@@ -293,7 +326,8 @@ one_procedure <- function(config, prev_results = list()) {
     structure(
       results, 
       grid_pos=grid_pos,
-      sim_para=config$sim_para
+      sim_para=config$sim_para,
+      there_is_time=config$there_is_time
     ))
   ))  
 }
@@ -329,6 +363,12 @@ one_mixture_grid <- function(config) {
       }
       
       for (k in 1:config$ds_draws) {
+        
+        config <- is_there_time(config)
+        if (!config$there_is_time) {
+          if(config$verbose){cat("<*><*><*><*> WE'RE OUT OF TIME! <*><*><*><*>")}
+          return(results)
+        }
         
         if (config$verbose) {
           cat("ds_draw",k,"of",config$ds_draws,
@@ -374,7 +414,8 @@ simulation <- function(config) {
     }
   }
   
-  structure(results, config=config)
+  structure(results, config=config,
+            there_is_time=is_there_time(config)$there_is_time)
 }
 
 # Summary functions -------------------------------------------------------

@@ -39,7 +39,7 @@ ms_grid <- mutate(ms_grid
 ds_grid <- expand.grid(
   
   # n_1 (n_2) or n/2 sample size      
-  NN=500 #seq(1500, 3000, by = 500)
+  NN=seq(1500, 3000, by = 500)
   
   # additional components in alternative
   ,LL=c(1,2) 
@@ -64,6 +64,9 @@ config <- create_config(
   # whether this is a SLURM array job (array ids should be 1:length(NN))
   ,slurm_array=F
   
+  # max time (in sec) that this job is allowed to run for before wrapping up
+  ,max_elapsed=100
+  
   # MixSim parameter grid
   ,ms_grid=ms_grid
   
@@ -87,6 +90,9 @@ config <- create_config(
   
   # covariance matrix structure (FALSE = non-spherical, TRUE = spherical).
   ,sph=F
+  
+  # the approximate time that the script started running
+  ,start_time=Sys.time()
   
 )
 
