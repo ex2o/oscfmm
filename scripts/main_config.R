@@ -6,7 +6,7 @@
 ms_grid <- expand.grid(
   
   # dimension of mixture model
-  DD=2  
+  DD=c(2,4)  
   
   # value of desired average overlap for MixSim function (can be NULL)
   ,BO=c(0.01,0.05)
@@ -15,7 +15,7 @@ ms_grid <- expand.grid(
   #,MO=c(0.001,0.01,0.05)
   
   # generative number of components
-  ,TrueG=5 #c(5,10)  
+  ,TrueG=c(5,10)  
   
   # error bound for overlap computation (default).
   ,eps=1e-03
@@ -39,10 +39,10 @@ ms_grid <- mutate(ms_grid
 ds_grid <- expand.grid(
   
   # n_1 (n_2) or n/2 sample size      
-  NN=500 #seq(1500, 3000, by = 500)
+  NN=c(1000,2000,3000,5000,10000,100000)
   
   # additional components in alternative
-  ,LL=c(1,2) 
+  ,LL=c(1,2)
   
 )
 
@@ -56,13 +56,13 @@ config <- create_config(
   ms_draws=NULL
   
   # number of draws of random datasets from simdataset
-  ,ds_draws=2
+  ,ds_draws=100
   
   # whether to parallelise (at the level of ms_draws only)
   ,parallel=T  
   
   # whether this is a SLURM array job
-  ,slurm_array=F
+  ,slurm_array=T
   
   # the name of the grid where slurm_array_col is located
   ,slurm_array_grid="ds_grid"
@@ -71,7 +71,7 @@ config <- create_config(
   ,slurm_array_col="NN"
   
   # max time (in sec) that this job is allowed to run for before wrapping up
-  ,max_elapsed=Inf
+  ,max_elapsed=39600
   
   # MixSim parameter grid
   ,ms_grid=ms_grid
@@ -96,7 +96,7 @@ config <- create_config(
   
   # covariance matrix structure (FALSE = non-spherical, TRUE = spherical).
   ,sph=F
-
+  
   # the approximate time that the script started running
   ,start_time=Sys.time()
   
