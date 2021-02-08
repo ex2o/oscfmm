@@ -1,7 +1,6 @@
 #results <- readRDS("../results/local/sim_recursive/results_9529835.rds")
 
-results <- readRDS("results1_.rds")
-
+results <- readRDS("results1_2.rds")
 
 # Remove errors and check error rate
 errd <- errored(results)

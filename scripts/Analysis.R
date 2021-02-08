@@ -23,6 +23,9 @@ load_packages(packages)
 source("Test_config.R") 
 #source("Main_config.R")
 
+# Print the recorded start_time from config
+cat("Start time:",substr(capture.output(print(config$start_time)),6,29),"\n")
+
 # Perform simulations
 results <- NULL
 t <- system.time({
@@ -34,6 +37,6 @@ save_results(results, config$slurm_task_id)
 
 # Print diagnostics
 cat("Number of ms_draws errored out: ", sum(errored(results)),"\n")
-cat("User time = ", t[1],"s")
+cat("User time = ", t[1],"s\n")
 cat("---- structure of output ----\n")
 str(results, max.level=1, vec.len=2, list.len=2)

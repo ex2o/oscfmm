@@ -61,8 +61,14 @@ config <- create_config(
   # whether to parallelise (at the level of ms_draws only)
   ,parallel=T  
   
-  # whether this is a SLURM array job (array ids should be 1:length(NN))
+  # whether this is a SLURM array job
   ,slurm_array=F
+  
+  # the name of the grid where slurm_array_col is located
+  ,slurm_array_grid="ds_grid"
+  
+  # the column of slurm_array_grid that will be used for the slurm_array job
+  ,slurm_array_col="NN"
   
   # max time (in sec) that this job is allowed to run for before wrapping up
   ,max_elapsed=Inf

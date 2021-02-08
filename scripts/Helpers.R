@@ -125,16 +125,24 @@ prepare_for_slurm_array <- function(config) {
     config$slurm_task_id <- as.numeric(Sys.getenv('SLURM_ARRAY_TASK_ID'))
     
     if (!is.na(config$slurm_task_id)) {
-      cat("slurm array job, task id: ", config$slurm_task_id)
+      cat("slurm array job, task id:", config$slurm_task_id,"\n")
     } else {
       stop("slurm array job but no slurm task id was found")
     }
     
-    all_NN <- config$ds_grid$NN
-    this_NN <- unique(all_NN)[config$slurm_task_id]
-    config$ds_grid <- config$ds_grid[all_NN == this_NN,]
+    slg <- config$slurm_array_grid
+    slv <- config$slurm_array_col
+    all_v <- config[[slg]][[slv]]
+    unique_v <- unique(all_v)
+    if (config$slurm_task_id > length(unique_v)) {
+      stop("Task id", config$slurm_task_id,
+           "greater than length(unique_v)=",
+           length(unique_v))
+    }
+    this_v <- unique_v[config$slurm_task_id]
+    config[[slg]] <- config[[slg]][all_v == this_v,]
 
-    cat("this task uses NN=",this_NN,"\n")
+    cat("this task uses this_v=",this_v,"\n")
     
   } else {
     
@@ -301,7 +309,6 @@ one_procedure <- function(config, prev_results = list()) {
   config$Gmax <- config$ms_grid_point$TrueG + config$Gextra
   
   # Check that enough time remains to execute another procedure.
-  
   config <- is_there_time(config)
   
   GG <- 1
@@ -319,6 +326,8 @@ one_procedure <- function(config, prev_results = list()) {
     
     check <- all(results[GG,] >= 0.05) | (GG == config$Gmax)
     if (check) { break }
+  
+    config <- is_there_time(config)
     GG <- GG + 1
   }
   
@@ -366,7 +375,8 @@ one_mixture_grid <- function(config) {
         
         config <- is_there_time(config)
         if (!config$there_is_time) {
-          if(config$verbose){cat("<*><*><*><*> WE'RE OUT OF TIME! <*><*><*><*>")}
+          if(config$verbose){
+            cat("<*><*><*><*> WE'RE OUT OF TIME! <*><*><*><*>\n")}
           return(results)
         }
         
