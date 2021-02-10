@@ -1,38 +1,79 @@
+source("Helpers.R")
+packages <- c("mclust", 
+              "MixSim", 
+              "doParallel", 
+              "parallel", 
+              "foreach",
+              "magrittr",
+              "ggplot2",
+              "dplyr",
+              "tidyr")
+load_packages(packages)
+
 #results <- readRDS("../results/local/sim_recursive/results_9529835.rds")
+#results <- readRDS("../results/local/sim_timed/results1_1.rds")
 
-results <- readRDS("results1_2.rds")
+files <- paste0("../results/local/sim_timed2/results1_",c(1,2,3,4,5,6),".rds")
 
-# Remove errors and check error rate
-errd <- errored(results)
-sum(errd)/length(results)
-results <- results[!errd]
+# load the result files
+results_list <- sapply(files, readRDS)
 
-# combine first accepts into a table
-res <- combine_first_accepts(results)
+# Peek at the result list structure
+peek(results_list)
 
-# Remove NAs and look at NA rate
-res0 <- res %>% drop_na()
-(1 - nrow(res0)/nrow(res))
+res <- read_clean_and_combine_first_accepts(results_list)
+
+head(res)
+
+# Table of sample sizes in each parameter combination
+table(select(res, !starts_with("p"), -msid))
+
+# Check the alpha_p3 (significance) for each msid
+resg <- group_by(res, msid, TrueG)
+msg <- summarize(resg
+                 ,alpha_p1 = mean(p1 > 5) 
+                 ,alpha_p2 = mean(p2 > 5)
+                 ,alpha_p3 = mean(p3 > 5)
+                 ,n = n()
+)
+msg
+plot(msg$n, msg$alpha_p1, main = "alpha_p3 by mixture draw sample size")
+hist(msg$alpha_p3, main = "alpha_p3 for each mixture draw", breaks=200)
+
+# obtain msids above a certain alpha_3 cutoff point
+good_msids <- filter(msg, alpha_p3 < 0.15)$msid
+
+# filter to only good msids 
+resf <- filter(res, msid %in% good_msids)
+
+# Group by unique parameter combination for summary stats
+resg <- group_by(resf, across(!starts_with(c("p","msid"))))
+summarize(resg
+         ,n = n() 
+         ,mu_p1 = mean(p1) 
+         ,mu_p2 = mean(p2) 
+         ,mu_p3 = mean(p3)
+         ,alpha_p1 = mean(p1 > 5) 
+         ,alpha_p2 = mean(p2 > 5)
+         ,alpha_p3 = mean(p3 > 5)
+         ,ms_draws = length(unique(msid))
+)
 
 # Subset the results
-res1 <- res0 %>% filter(
-  BO == 0.01
+res1 <- resf %>% filter(
+  BO == 0.05
  ,LL == 1
  ,TrueG == 5
  ,DD == 2
- ,NN == 500
+ ,msid %in% good_msids
 )
 
-# Look at sample size
+# Look at subset sample size
 nrow(res1)
 
-# Look at sample ratio
-nrow(res1)/nrow(res0)
+# Look at subset size ratio
+nrow(res1)/nrow(resf)
 
-# Look at fail rate
-sum(res1$p1 > 5)/nrow(res1)
-sum(res1$p2 > 5)/nrow(res1)
-sum(res1$p3 > 5)/nrow(res1)
 
 # Plot 1 ------------------------------------------------------------------
 #

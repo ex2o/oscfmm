@@ -62,7 +62,7 @@ config <- create_config(
   ,parallel=T  
   
   # whether this is a SLURM array job
-  ,slurm_array=T
+  ,slurm_array=F
   
   # the name of the grid where slurm_array_col is located
   ,slurm_array_grid="ds_grid"
@@ -99,6 +99,9 @@ config <- create_config(
   
   # the approximate time that the script started running
   ,start_time=Sys.time()
+  
+  # whether to use the RcppArmadillo based function one_g_step
+  ,use_rcpp=T
   
 )
 

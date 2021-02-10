@@ -1,5 +1,11 @@
 # Utilities ---------------------------------------------------------------
 
+# Peek at a list object with regular structure
+
+peek <- function(obj) {
+  str(obj, max.level=1, vec.len=2, list.len=2)
+}
+
 load_packages <- Vectorize(function(package) {
   
   if (!require(package, character.only = T)) {
@@ -28,6 +34,14 @@ create_config <- function(...) {
   cat("---- Dataset draw Grid ----\n")
   print(config$ds_grid)
   cat("\n")
+  
+  if (config$use_rcpp) {
+    config$g_stepper <- one_g_step_rcpp
+    cat("Planning to use Rcpp","\n")
+  } else {
+    config$g_stepper <- one_g_step
+    cat("Not planning to use Rcpp","\n")
+  }
   
   config <- prepare_model_names(config)
   
@@ -87,14 +101,22 @@ prepare_cluster <- function(config) {
     i = 1:config$ms_draws
     ,.inorder = FALSE
     ,.combine = combiner, .init = list()
-    ,.export = c("one_mixture_grid",
-                 "one_procedure", 
-                 "one_g_step",
-                 "retry_on_error", 
-                 "mixsim", 
-                 "simdata",
-                 "worker",
-                 "is_there_time")
+    ,.export = c("one_mixture_grid"
+                ,"one_procedure" 
+                ,"one_g_step"
+                ,"retry_on_error" 
+                ,"mixsim" 
+                ,"simdata"
+                ,"worker"
+                ,"is_there_time"
+                ,"kmeans"
+                ,"me"
+                ,"fit_mixture_rcpp"
+                ,"compute_likelihood_rcpp"
+                ,"one_g_step_rcpp"
+                ,"make_GMM_arma"
+                ,"cxxfunction"
+                ,"signature")
   )
   
   # Activate the cluster
@@ -127,7 +149,8 @@ prepare_for_slurm_array <- function(config) {
     if (!is.na(config$slurm_task_id)) {
       cat("slurm array job, task id:", config$slurm_task_id,"\n")
     } else {
-      stop("slurm array job but no slurm task id was found")
+      stop("slurm array job but no slurm task id was found",
+           "check the slurm_array setting in config\n")
     }
     
     slg <- config$slurm_array_grid
@@ -254,6 +277,39 @@ simdata <- function(config) {
     S=config$sim_para$S)
 }
 
+make_GMM_arma <- function() {
+  # Load ARMA code
+  gmm_full_src <- '
+    using namespace arma;
+    // Convert necessary matrix objects to arma
+    mat data_a = as<mat>(data_r);
+    rowvec pi_a = as<rowvec>(pi_r);
+    mat mean_a = as<mat>(mean_r);
+    cube cov_a = as<cube>(cov_r);
+    int maxit_a = as<int>(maxit_r);
+    int groups_a = as<int>(groups_r);
+    // Initialize a gmm_full object
+    gmm_full model;
+    // Set the parameters
+    model.set_params(mean_a, cov_a, pi_a);
+    model.learn(data_a, groups_a, maha_dist, keep_existing, 0, maxit_a, 2.2e-16, false);
+    // 
+    return Rcpp::List::create(
+      Rcpp::Named("log-likelihood")=model.sum_log_p(data_a),
+      Rcpp::Named("proportions")=model.hefts,
+      Rcpp::Named("means")=model.means,
+      Rcpp::Named("covariances")=model.fcovs);
+  '
+  cxxfunction(signature(data_r='numeric',
+                        pi_r='numeric',
+                        mean_r='numeric',
+                        cov_r='numeric',
+                        maxit_r='integer',
+                        groups_r='integer'),
+              gmm_full_src, plugin = 'RcppArmadillo')
+  
+}
+
 # Sim functions -----------------------------------------------------------
 
 # fit mixture models, and compute p-values 
@@ -286,6 +342,67 @@ one_g_step <- function(Data1, Data2, GG, LL) {
   
   return(c(P1, P2, P_bar))
 }
+
+# An rcpp alternative to one_g_step
+
+one_g_step_rcpp <- function(Data1, Data2, GG, LL) {
+  
+  # Fit mixtures under null hypothesis
+  MC1_null <- fit_mixture_rcpp(Data1, GG, config)
+  MC2_null <- fit_mixture_rcpp(Data2, GG, config)
+  
+  # Fit mixtures under the alternative hypothesis
+  MC1_alt  <- fit_mixture_rcpp(Data1, GG+LL, config)
+  MC2_alt  <- fit_mixture_rcpp(Data2, GG+LL, config)
+
+  # Calculate test statistics
+  V1 <- compute_likelihood_rcpp(Data1, MC1_null, MC2_alt, GG+LL)
+  V2 <- compute_likelihood_rcpp(Data2, MC2_null, MC1_alt, GG+LL)
+  
+  V_bar <- (V1+V2)/2
+  
+  # Calculate P-values
+  P1 <- min(1/V1,1)
+  P2 <- min(1/V2,1)
+  P_bar <- min(1/V_bar,1)
+  
+  return(c(P1, P2, P_bar))
+}
+
+fit_mixture_rcpp <- function(Data, CC, config) {
+  
+  # Initialize a clustering using k-means
+  K_means_init <- kmeans(Data$X, centers = CC, 
+                         iter.max=100, nstar=100) 
+  
+  # Use mclust to convert kmeans to parameters
+  param_init <- me(config$modelNames, Data$X, 
+                   z=unmap(K_means_init$cluster), 
+                   control=emControl(itmax=1)) 
+  
+  # Run GMM using arma
+  MC <- GMM_arma(t(Data$X),
+                 param_init$parameters$pro, 
+                 param_init$parameters$mean,
+                 param_init$parameters$variance$sigma,
+                 2000, CC)   
+  MC
+}
+
+
+compute_likelihood_rcpp <- function(Data, MC_null, MC_alt, CC) {
+  
+  # Use arma code to calculate likelihood at specified parameters (i.e., run with zero iterations)
+  Log_lik <- GMM_arma(t(Data$X),
+                      MC_alt$proportions, 
+                      MC_alt$means,
+                      MC_alt$covariances,
+                      0, CC)$`log-likelihood` 
+  
+  # Compute likelihood
+  exp(Log_lik - MC_null$`log-likelihood`)
+}
+
 
 # Take a draw from simdataset and perform one_procedure
 
@@ -321,7 +438,7 @@ one_procedure <- function(config, prev_results = list()) {
     }
     
     results[GG, ] <- retry_on_error({
-        one_g_step(Data1, Data2, GG, config$ds_grid_point$LL)
+        config$g_stepper(Data1, Data2, GG, config$ds_grid_point$LL)
       }, max_errors=2, no_error=F)
     
     check <- all(results[GG,] >= 0.05) | (GG == config$Gmax)
@@ -347,6 +464,11 @@ one_procedure <- function(config, prev_results = list()) {
 one_mixture_grid <- function(config) {
   
   results <- list()
+  
+  if (config$use_rcpp) {
+    if (config$verbose) {cat("Making GMM_arma on",worker(),"\n")}
+    assign("GMM_arma", make_GMM_arma(), envir=.GlobalEnv)
+  }
   
   for (i in 1:nrow(config$ms_grid)) {
     
@@ -472,3 +594,59 @@ add_quantiles <- function(results, alpha=0.1) {
           ,p3_qU = quantile(p3, probs=1-alpha/2))
   res
 }
+
+# The function takes an input vector of paths to multiple
+# result files in rds format, and combines their cleaned
+# first_accepts tables
+
+read_clean_and_combine_first_accepts <- function(files) { 
+  
+  # Remove errors and check error rates
+  results <- lapply(results_list, function(x){
+    errd <- errored(x)
+    cat("Errored=",sum(errd)/length(x),"\n")
+    x[!errd]
+  })
+  
+  # combine first accepts into a tables
+  res <- lapply(results, combine_first_accepts)
+  
+  # extract ms_draw ids and add to the tables
+  msid <- lapply(results, ms_draw_ids)
+  for (i in 1:length(res)) {
+    res[[i]] <- data.frame(res[[i]], msid = msid[[i]])
+    cat("Number of ms_draws=",
+        length(unique(msid[[i]])),"\n")
+  }
+  
+  # Remove NAs and look at NA rates
+  res0 <- lapply(res, function(x){
+    x0 <- drop_na(x)
+    cat("NA ratio=",(1 - nrow(x0)/nrow(x)),"\n")
+    x0
+  })
+  
+  # Bind into a single data.frame
+  out <- do.call(rbind, res0)
+  rownames(out) <- NULL
+  
+  # Drop the column eps
+  out[,!(names(out) %in% "eps")]
+}
+
+
+
+# Give a unique ID to each unique ms_draw in the results
+
+ms_draw_ids <- function(results) {
+  
+  # Using just the first element of the Mu matrix as a unique id for an ms_draw
+  as.integer((
+    unlist(lapply(results, function(x){attr(x,"sim_para")$Mu[1,1]}))
+  )*1000000000)
+}
+
+
+
+
+

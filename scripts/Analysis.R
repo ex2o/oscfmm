@@ -14,7 +14,10 @@ packages <- c("mclust",
               "magrittr",
               "ggplot2",
               "dplyr",
-              "tidyr")
+              "tidyr",
+              "Rcpp",
+              "RcppArmadillo",
+              "inline")
 load_packages(packages)
 
 ### Choose config script:
@@ -39,4 +42,4 @@ save_results(results, config$slurm_task_id)
 cat("Number of ms_draws errored out: ", sum(errored(results)),"\n")
 cat("User time = ", t[1],"s\n")
 cat("---- structure of output ----\n")
-str(results, max.level=1, vec.len=2, list.len=2)
+peek(results)
