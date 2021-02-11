@@ -343,3 +343,11 @@ Execution halted
 Error in unserialize(node$con) : error reading from connection
 Calls: <Anonymous> ... doTryCatch -> recvData -> recvData.SOCKnode -> unserialize
 Execution halted
+starting worker pid=9340 on localhost:11916 at 15:37:40.089
+starting worker pid=1564 on localhost:11916 at 15:37:40.092
+starting worker pid=2420 on localhost:11916 at 15:37:40.106
+starting worker pid=3064 on localhost:11916 at 15:37:40.127
+starting worker pid=13268 on localhost:11916 at 15:37:40.134
+starting worker pid=3776 on localhost:11916 at 15:37:40.151
+starting worker pid=10628 on localhost:11916 at 15:37:40.165
+starting worker pid=3912 on localhost:11916 at 15:37:40.171

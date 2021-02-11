@@ -1,10 +1,5 @@
-source("Helpers.R")
-packages <- c("mclust", 
-              "MixSim", 
-              "doParallel", 
-              "parallel", 
-              "foreach",
-              "magrittr",
+source("Descriptive_functions.R")
+packages <- c("magrittr",
               "ggplot2",
               "dplyr",
               "tidyr")
@@ -12,6 +7,8 @@ load_packages(packages)
 
 #results <- readRDS("../results/local/sim_recursive/results_9529835.rds")
 #results <- readRDS("../results/local/sim_timed/results1_1.rds")
+
+results <- readRDS("results1_.rds")
 
 files <- paste0("../results/local/sim_timed2/results1_",c(1,2,3,4,5,6),".rds")
 
@@ -21,7 +18,7 @@ results_list <- sapply(files, readRDS)
 # Peek at the result list structure
 peek(results_list)
 
-res <- read_clean_and_combine_first_accepts(results_list)
+res <- read_clean_and_combine_first_accepts(list(results))
 
 head(res)
 
@@ -43,8 +40,12 @@ hist(msg$alpha_p3, main = "alpha_p3 for each mixture draw", breaks=200)
 # obtain msids above a certain alpha_3 cutoff point
 good_msids <- filter(msg, alpha_p3 < 0.15)$msid
 
+# Check that there are no bad msids
+check <- length(good_msids) == nrow(msg)
+if (!check) warning("There are bad msids")
+
 # filter to only good msids 
-resf <- filter(res, msid %in% good_msids)
+resf <- res #filter(res, msid %in% good_msids)
 
 # Group by unique parameter combination for summary stats
 resg <- group_by(resf, across(!starts_with(c("p","msid"))))
@@ -61,7 +62,7 @@ summarize(resg
 
 # Subset the results
 res1 <- resf %>% filter(
-  BO == 0.05
+  BO == 0.01
  ,LL == 1
  ,TrueG == 5
  ,DD == 2

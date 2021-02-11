@@ -16,4 +16,5 @@ The array job [univ-inf-arr.sh](univ-inf-arr.sh) will have `#SBATCH --array=1-n`
 2. Set `config$slurm_array=T` 
 3. Check the `max_elapsed` in config suits the job time in [univ-inf-arr.sh](univ-inf-arr.sh)
 4. Check that `config$parallel=T`
+5. Check that `use_rcpp` is set to the desired value
 

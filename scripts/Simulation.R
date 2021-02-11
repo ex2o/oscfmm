@@ -5,7 +5,8 @@
 
 # Simulation --------------------------------------------------------------
 
-source("Helpers.R")
+source("Simulation_functions.R")
+source("Utility_functions.R")
 packages <- c("mclust", 
               "MixSim", 
               "doParallel", 
@@ -23,7 +24,7 @@ load_packages(packages)
 ### Choose config script:
 ### * test_config.R - debugging / exploration
 ### * main_config.R - for full simulation
-source("Test_config.R") 
+source("Config.R") 
 #source("Main_config.R")
 
 # Print the recorded start_time from config
