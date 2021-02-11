@@ -110,9 +110,7 @@ prepare_cluster <- function(config) {
                 ,"worker"
                 ,"is_there_time"
                 ,"kmeans"
-                ,"me"
-                ,"fit_mixture_rcpp"
-                ,"compute_likelihood_rcpp"
+                ,"create_rcpp_functions"
                 ,"one_g_step_rcpp"
                 ,"make_GMM_arma"
                 ,"cxxfunction"
@@ -205,43 +203,63 @@ save_results <- function(results,slurm_task_id) {
 # if this function is used in a foreach loop then config should be passed
 # in to allow the cluster to be stopped
 
+# After max_errors, this function gives up and returns an error, unless
+# no_error=TRUE, in which case it returns only a message string.
+# if this function is used in a foreach loop then config should be passed
+# in to allow the cluster to be stopped
+
+# retry_on_error <- function(
+#   expr,
+#   is_error=function(x) "try-error" %in% class(x),
+#   max_errors=10,
+#   no_error=F,
+#   prev_attempts=0,
+#   config=NULL) {
+# 
+#   attempts <- prev_attempts
+#   retval <- try(eval(expr))
+#   while (is_error(retval)) {
+#     attempts <- attempts + 1
+#     if (attempts >= max_errors) {
+#       msg <- sprintf("retry: too many retries [[%s]]\n",
+#                      retval[1])
+#       retval <- msg
+#       if(!no_error) {
+#         if (!is.null(config)) {
+#           stopCluster(config$cl)
+#         }
+#         stop(msg)
+#       }
+#       break
+#     } else {
+#       msg <- sprintf("retry: error in attempt %i/%i [[%s]]\n",
+#                      attempts,
+#                      max_errors,
+#                      retval[1])
+#       if (!is.null(config)) {
+#         if (config$verbose) {
+#           cat(">>>>>>>>>> errored <<<<<<<<<< at", date(),"on",worker(),"\n")
+#         }
+#       }
+#       warning(msg)
+#     }
+#     retval <- try(eval(expr))
+#   }
+#   return(structure(retval, attempts = attempts))
+# }
+
+# Uncomment below (and comment above) for debugging
+
 retry_on_error <- function(
-  expr, 
-  is_error=function(x) "try-error" %in% class(x), 
+  expr,
+  is_error=function(x) "try-error" %in% class(x),
   max_errors=10,
   no_error=F,
   prev_attempts=0,
   config=NULL) {
   
   attempts <- prev_attempts
-  retval <- try(eval(expr))
-  while (is_error(retval)) {
-    attempts <- attempts + 1
-    if (attempts >= max_errors) {
-      msg <- sprintf("retry: too many retries [[%s]]\n", 
-                     retval[1])
-      retval <- msg
-      if(!no_error) {
-        if (!is.null(config)) {
-          stopCluster(config$cl)
-        }
-        stop(msg)
-      }
-      break
-    } else {
-      msg <- sprintf("retry: error in attempt %i/%i [[%s]]\n", 
-                     attempts, 
-                     max_errors, 
-                     retval[1])
-      if (!is.null(config)) {
-        if (config$verbose) {
-          cat(">>>>>>>>>> errored <<<<<<<<<< at", date(),"on",worker(),"\n")
-        }
-      }
-      warning(msg)
-    }
-    retval <- try(eval(expr))
-  }
+  retval <- eval(expr)
   return(structure(retval, attempts = attempts))
 }
 
@@ -314,8 +332,10 @@ make_GMM_arma <- function() {
 
 # fit mixture models, and compute p-values 
 
-one_g_step <- function(Data1, Data2, GG, LL) {
+one_g_step <- function(Data1, Data2, GG, config) {
   
+  LL <- config$ds_grid_point$LL
+
   # Fit mixtures under null hypothesis
   MC1_null <- mclust::densityMclust(
     Data1$X, G=GG, modelNames=config$modelNames, verbose=F)
@@ -343,9 +363,162 @@ one_g_step <- function(Data1, Data2, GG, LL) {
   return(c(P1, P2, P_bar))
 }
 
-# An rcpp alternative to one_g_step
+# An rcpp alternative to one_g_step. Creating these in here is a work around
+# for Rcpp parallel processing problems with exporting to cores in foreach.
+# These functions rely on GMM_arma, and they were not found unless they were
+# created on the cores.
 
-one_g_step_rcpp <- function(Data1, Data2, GG, LL) {
+create_rcpp_functions <- function(config) {
+  
+  if (config$use_rcpp) {
+    
+    if (config$verbose) {cat("Making GMM_arma on",worker(),"\n")}
+    
+    assign("GMM_arma", make_GMM_arma(), envir=.GlobalEnv)
+    
+    fit_mixture_rcpp <- function(Data, CC, config) {
+      
+      # Initialize a clustering using k-means
+      K_means_init <- kmeans(Data$X, centers = CC,
+                             iter.max=100, nstar=100)
+      
+      # Use mclust to convert kmeans to parameters
+      param_init <- mclust::meVVV(Data$X,
+                       z=mclust::unmap(K_means_init$cluster),
+                       control=mclust::emControl(itmax=1))
+      
+      # Run GMM using arma
+      MC <- GMM_arma(t(Data$X),
+                     param_init$parameters$pro,
+                     param_init$parameters$mean,
+                     param_init$parameters$variance$sigma,
+                     2000, CC)
+      MC
+    }
+    
+    assign("fit_mixture_rcpp",fit_mixture_rcpp,envir=.GlobalEnv)
+    
+    compute_likelihood_rcpp <- function(Data, MC_null, MC_alt, CC) {
+      
+      # Use arma code to calculate likelihood at specified parameters (i.e., run with zero iterations)
+      Log_lik <- GMM_arma(t(Data$X),
+                          MC_alt$proportions, 
+                          MC_alt$means,
+                          MC_alt$covariances,
+                          0, CC)$`log-likelihood` 
+      
+      # Compute likelihood
+      exp(Log_lik - MC_null$`log-likelihood`)
+    }
+    
+    assign("compute_likelihood_rcpp",compute_likelihood_rcpp,envir=.GlobalEnv)
+    
+  }
+}
+
+# one_g_step_rcpp <- function(Data1, Data2, GG, config) {
+# 
+#   LL <- config$ds_grid_point$LL
+# 
+#   # Initialize a clustering using k-means
+#   K_means_init <- kmeans(Data1$X, centers = GG,
+#                          iter.max=100, nstar=100)
+# 
+#   # Use mclust to convert kmeans to parameters
+#   param_init <- mclust::meVVV(Data1$X,
+#                    z=mclust::unmap(K_means_init$cluster),
+#                    control=mclust::emControl(itmax=1))
+# 
+#   # Run GMM using arma
+#   MC1_null <- GMM_arma(t(Data1$X),
+#                  param_init$parameters$pro,
+#                  param_init$parameters$mean,
+#                  param_init$parameters$variance$sigma,
+#                  2000, GG)
+# 
+#   # Initialize a clustering using k-means
+#   K_means_init <- kmeans(Data2$X, centers = GG,
+#                          iter.max=100, nstar=100)
+# 
+#   # Use mclust to convert kmeans to parameters
+#   param_init <- mclust::meVVV(Data2$X,
+#                    z=mclust::unmap(K_means_init$cluster),
+#                    control=mclust::emControl(itmax=1))
+# 
+#   # Run GMM using arma
+#   MC2_null <- GMM_arma(t(Data2$X),
+#                        param_init$parameters$pro,
+#                        param_init$parameters$mean,
+#                        param_init$parameters$variance$sigma,
+#                        2000, GG)
+# 
+#   # Initialize a clustering using k-means
+#   K_means_init <- kmeans(Data1$X, centers = GG+LL,
+#                          iter.max=100, nstar=100)
+# 
+#   # Use mclust to convert kmeans to parameters
+#   param_init <- mclust::meVVV(Data1$X,
+#                    z=mclust::unmap(K_means_init$cluster),
+#                    control=mclust::emControl(itmax=1))
+# 
+#   # Run GMM using arma
+#   MC1_alt <- GMM_arma(t(Data1$X),
+#                        param_init$parameters$pro,
+#                        param_init$parameters$mean,
+#                        param_init$parameters$variance$sigma,
+#                        2000, GG+LL)
+# 
+#   # Initialize a clustering using k-means
+#   K_means_init <- kmeans(Data2$X, centers = GG+LL,
+#                          iter.max=100, nstar=100)
+# 
+#   # Use mclust to convert kmeans to parameters
+#   param_init <- mclust::meVVV(Data2$X,
+#                    z=mclust::unmap(K_means_init$cluster),
+#                    control=mclust::emControl(itmax=1))
+# 
+#   # Run GMM using arma
+#   MC2_alt <- GMM_arma(t(Data2$X),
+#                       param_init$parameters$pro,
+#                       param_init$parameters$mean,
+#                       param_init$parameters$variance$sigma,
+#                       2000, GG+LL)
+# 
+# 
+#   # Calculate test statistics
+#   # Calculate test statistics
+#   # Use arma code to calculate likelihood at specified 
+#   # parameters (i.e., run with zero iterations)
+#   Log_lik_MC2_alt_on_D1 <- GMM_arma(t(Data1$X),
+#                                     MC2_alt$proportions, 
+#                                     MC2_alt$means,
+#                                     MC2_alt$covariances,
+#                                     0,GG+LL)$`log-likelihood` 
+#   
+#   # Compute likelihood
+#   V1 <- exp(Log_lik_MC2_alt_on_D1 - MC1_null$`log-likelihood`) # Compute
+#   
+#   Log_lik_MC1_alt_on_D2 <- GMM_arma(t(Data2$X),
+#                                     MC1_alt$proportions, 
+#                                     MC1_alt$means,
+#                                     MC1_alt$covariances,
+#                                     0,GG+LL)$`log-likelihood`
+#   
+#   V2 <- exp(Log_lik_MC1_alt_on_D2 - MC2_null$`log-likelihood`)
+#   
+#   V_bar <- (V1+V2)/2
+# 
+#   # Calculate P-values
+#   P1 <- min(1/V1,1)
+#   P2 <- min(1/V2,1)
+#   P_bar <- min(1/V_bar,1)
+# 
+#   return(c(P1, P2, P_bar))
+# }
+
+one_g_step_rcpp <- function(Data1, Data2, GG, config) {
+  
+  LL <- config$ds_grid_point$LL
   
   # Fit mixtures under null hypothesis
   MC1_null <- fit_mixture_rcpp(Data1, GG, config)
@@ -354,7 +527,7 @@ one_g_step_rcpp <- function(Data1, Data2, GG, LL) {
   # Fit mixtures under the alternative hypothesis
   MC1_alt  <- fit_mixture_rcpp(Data1, GG+LL, config)
   MC2_alt  <- fit_mixture_rcpp(Data2, GG+LL, config)
-
+  
   # Calculate test statistics
   V1 <- compute_likelihood_rcpp(Data1, MC1_null, MC2_alt, GG+LL)
   V2 <- compute_likelihood_rcpp(Data2, MC2_null, MC1_alt, GG+LL)
@@ -368,41 +541,6 @@ one_g_step_rcpp <- function(Data1, Data2, GG, LL) {
   
   return(c(P1, P2, P_bar))
 }
-
-fit_mixture_rcpp <- function(Data, CC, config) {
-  
-  # Initialize a clustering using k-means
-  K_means_init <- kmeans(Data$X, centers = CC, 
-                         iter.max=100, nstar=100) 
-  
-  # Use mclust to convert kmeans to parameters
-  param_init <- me(config$modelNames, Data$X, 
-                   z=unmap(K_means_init$cluster), 
-                   control=emControl(itmax=1)) 
-  
-  # Run GMM using arma
-  MC <- GMM_arma(t(Data$X),
-                 param_init$parameters$pro, 
-                 param_init$parameters$mean,
-                 param_init$parameters$variance$sigma,
-                 2000, CC)   
-  MC
-}
-
-
-compute_likelihood_rcpp <- function(Data, MC_null, MC_alt, CC) {
-  
-  # Use arma code to calculate likelihood at specified parameters (i.e., run with zero iterations)
-  Log_lik <- GMM_arma(t(Data$X),
-                      MC_alt$proportions, 
-                      MC_alt$means,
-                      MC_alt$covariances,
-                      0, CC)$`log-likelihood` 
-  
-  # Compute likelihood
-  exp(Log_lik - MC_null$`log-likelihood`)
-}
-
 
 # Take a draw from simdataset and perform one_procedure
 
@@ -438,7 +576,7 @@ one_procedure <- function(config, prev_results = list()) {
     }
     
     results[GG, ] <- retry_on_error({
-        config$g_stepper(Data1, Data2, GG, config$ds_grid_point$LL)
+        config$g_stepper(Data1, Data2, GG, config)
       }, max_errors=2, no_error=F)
     
     check <- all(results[GG,] >= 0.05) | (GG == config$Gmax)
@@ -465,10 +603,7 @@ one_mixture_grid <- function(config) {
   
   results <- list()
   
-  if (config$use_rcpp) {
-    if (config$verbose) {cat("Making GMM_arma on",worker(),"\n")}
-    assign("GMM_arma", make_GMM_arma(), envir=.GlobalEnv)
-  }
+  create_rcpp_functions(config)
   
   for (i in 1:nrow(config$ms_grid)) {
     
