@@ -10,7 +10,10 @@ first_accept  <- function(res) {
   
   lapply(res, function(x){
     if (any(x < -99, na.rm=T)) {return(NA)}
-    apply(x, MARGIN=2, FUN=function(x){which(x >= 0.05)[1]})
+    apply(x, MARGIN=2, FUN=function(x){
+      w <- which(x >= 0.05)
+      if (length(w) == 0) {return(NA)}
+      w[1]})
   })
 }
 
