@@ -11,7 +11,8 @@ load_packages(packages)
 
 #results <- readRDS("results1_.rds")
 
-files <- paste0("../results/local/sim_rcpp/results1_",c(1,2,3,4,5,6),".rds")
+files <- paste0("../results/local/sim_rcpp/results", rep(1:5,6), "_",c(1,2,3,4,5,6),".rds")
+files <- files[!grepl("4_6", files)]
 
 # load the result files
 results_list <- sapply(files, readRDS)
