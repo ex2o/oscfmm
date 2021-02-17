@@ -3,24 +3,7 @@
 # for each row of ms_grid
 
 # Basic grid positions:
-ms_grid <- expand.grid(
-  
-  # dimension of mixture model
-  DD=2  
-  
-  # value of desired average overlap for MixSim function (can be NULL)
-  ,BO=c(0.01,0.05)
-  
-  # value of desired maximum overlap for MixSim function (can be NULL)
-  #,MO=c(0.001,0.01,0.05)
-  
-  # generative number of components
-  ,TrueG=5 #c(5,10)  
-  
-  # error bound for overlap computation (default).
-  ,eps=1e-03
-  
-)
+ms_grid <- readRDS("ms_grid.rds")
 
 # Parameters defined in terms of basic grid positions:
 ms_grid <- mutate(ms_grid
@@ -36,15 +19,7 @@ ms_grid <- mutate(ms_grid
 # for each row of ds_grid, and this will be repeated 
 # for each row of ms_grid
 
-ds_grid <- expand.grid(
-  
-  # n_1 (n_2) or n/2 sample size      
-  NN=c(1000,5000,10000)
-  
-  # additional components in alternative
-  ,LL=c(1,2) 
-  
-)
+ds_grid <- readRDS("ds_grid.rds")
 
 
 # ***************** Once-only configurations ****************
@@ -78,7 +53,7 @@ config <- create_config(
   ,slurm_array_col="NN"
   
   # max time (in sec) that this job is allowed to run for before wrapping up
-  ,max_elapsed=100
+  ,max_elapsed=54000 # 54000 = 15 hours
   
   # MixSim parameter grid
   ,ms_grid=ms_grid

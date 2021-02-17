@@ -11,8 +11,9 @@ load_packages(packages)
 
 #results <- readRDS("results1_.rds")
 
-files <- paste0("../results/local/sim_rcpp/results", rep(1:5,6), "_",c(1,2,3,4,5,6),".rds")
-files <- files[!grepl("4_6", files)]
+dir <- "../results/local/sim_rcpp/"
+names <- list.files(dir)
+files <- paste0(dir, names)
 
 # load the result files
 results_list <- sapply(files, readRDS)
@@ -27,7 +28,20 @@ res <- read_clean_and_combine_first_accepts(results_list)
 head(res)
 
 # Table of sample sizes in each parameter combination
-table(select(res, !starts_with("p"), -msid))
+t <- table(dplyr::select(res, !starts_with("p"), -msid)); t
+
+# Get parameter combinations that need more data
+# and export them for the HPC
+tdf <- string2numeric(as.data.frame(t, stringsAsFactors = F))
+tdf_low <- subset(tdf, Freq < 1000)
+ms_grid <- dplyr::select(tdf_low, c(DD, BO, TrueG))
+ds_grid <- dplyr::select(tdf_low, c(NN, LL))
+ms_grid$eps <- 0.001
+ms_grid
+ds_grid
+saveRDS(ms_grid, "ms_grid.rds")
+saveRDS(ds_grid, "ds_grid.rds")
+
 
 # Check the alpha_p3 (significance) for each msid
 resg <- group_by(res, msid, TrueG)

@@ -81,6 +81,9 @@ prepare_no_cores <- function(config) {
   }
   if (is.null(config$ms_draws)) {
     config$ms_draws <- config$no_cores
+    if(!is.null(config$ms_draws_max)) {
+      config$ms_draws <- min(config$ms_draws, config$ms_draws_max)
+    }
     cat("ms_draws=NULL, automatically set to no_cores=",config$ms_draws,"\n")
   }
   if (config$ms_draws %% config$no_cores != 0) {
@@ -151,19 +154,28 @@ prepare_for_slurm_array <- function(config) {
            "check the slurm_array setting in config\n")
     }
     
-    slg <- config$slurm_array_grid
-    slv <- config$slurm_array_col
-    all_v <- config[[slg]][[slv]]
-    unique_v <- unique(all_v)
-    if (config$slurm_task_id > length(unique_v)) {
-      stop("Task id", config$slurm_task_id,
-           "greater than length(unique_v)=",
-           length(unique_v))
+    if (config$slurm_array_singles) {
+      
+      config$ms_grid <- config$ms_grid[config$slurm_task_id,]
+      config$ds_grid <- config$ds_grid[config$slurm_task_id,]
+      
+      cat("this task uses single combos\n")
+      
+    } else {
+      slg <- config$slurm_array_grid
+      slv <- config$slurm_array_col
+      all_v <- config[[slg]][[slv]]
+      unique_v <- unique(all_v)
+      if (config$slurm_task_id > length(unique_v)) {
+        stop("Task id", config$slurm_task_id,
+             "greater than length(unique_v)=",
+             length(unique_v))
+      }
+      this_v <- unique_v[config$slurm_task_id]
+      config[[slg]] <- config[[slg]][all_v == this_v,]
+      
+      cat("this task uses this_v=",this_v,"\n")
     }
-    this_v <- unique_v[config$slurm_task_id]
-    config[[slg]] <- config[[slg]][all_v == this_v,]
-    
-    cat("this task uses this_v=",this_v,"\n")
     
   } else {
     
@@ -270,4 +282,12 @@ is_there_time <- function(config) {
   
   config$there_is_time <- structure(answer, elapsed=elapsed)
   config
+}
+
+
+string2numeric <- function(df) {
+  for (i in 1:ncol(df)) {
+    df[[i]] <- as.numeric(df[[i]])   
+  }
+  df
 }

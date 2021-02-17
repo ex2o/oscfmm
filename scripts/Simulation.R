@@ -26,6 +26,7 @@ load_packages(packages)
 ### * main_config.R - for full simulation
 source("Config.R") 
 #source("Main_config.R")
+source("Config_low_params.R") 
 
 # Print the recorded start_time from config
 cat("Start time:",substr(capture.output(print(config$start_time)),6,29),"\n")
