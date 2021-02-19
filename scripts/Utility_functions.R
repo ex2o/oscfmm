@@ -79,6 +79,9 @@ prepare_no_cores <- function(config) {
   if (config$free_core) {
     config$no_cores <- config$no_cores - 1
   }
+  if (!is.null(config$requested_cores)) {
+    config$no_cores <- min(config$no_cores, config$requested_cores)
+  }
   if (is.null(config$ms_draws)) {
     config$ms_draws <- config$no_cores
     if(!is.null(config$ms_draws_max)) {

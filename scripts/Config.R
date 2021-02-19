@@ -58,6 +58,9 @@ config <- create_config(
   # maximum value for ms_draws if ms_draws=NULL
   ,ms_draws_max=28
   
+  # number of cores requested from SLURM
+  ,requested_cores=16
+  
   # number of draws of random datasets from simdataset
   ,ds_draws=100
   

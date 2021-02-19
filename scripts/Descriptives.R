@@ -33,7 +33,7 @@ t <- table(dplyr::select(res, !starts_with("p"), -msid)); t
 # Get parameter combinations that need more data
 # and export them for the HPC
 tdf <- string2numeric(as.data.frame(t, stringsAsFactors = F))
-tdf_low <- subset(tdf, Freq < 1000)
+tdf_low <- subset(tdf, (NN < 1e5 & Freq < 1000) | (NN == 1e5 & Freq < 200))
 ms_grid <- dplyr::select(tdf_low, c(DD, BO, TrueG))
 ds_grid <- dplyr::select(tdf_low, c(NN, LL))
 ms_grid$eps <- 0.001
