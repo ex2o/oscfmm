@@ -1,47 +1,82 @@
-####
-# It could be worth considering RcppArmadillo replacement for mclust
-# https://github.com/hiendn/StoEMMIX/blob/master/R/EMalgorithmforGaussianMixtureARMA_exc.R
-####
+library(mclust)
+library(MixSim)
+library(Rcpp)
+library(RcppArmadillo)
+library(inline)
 
-# Simulation --------------------------------------------------------------
+source("Big_test_arma_3.R")
 
-source("Simulation_functions.R")
-source("Utility_functions.R")
-packages <- c("mclust", 
-              "MixSim", 
-              "doParallel", 
-              "parallel", 
-              "foreach",
-              "magrittr",
-              "ggplot2",
-              "dplyr",
-              "tidyr",
-              "Rcpp",
-              "RcppArmadillo",
-              "inline")
-load_packages(packages)
+# Seed
+# set.seed(4200) 
 
-### Choose config script:
-### * test_config.R - debugging / exploration
-### * main_config.R - for full simulation
-source("Config.R") 
-#source("Main_config.R")
-source("Config_low_params.R") 
+# A grid of simulation parameters
+params <- expand.grid(NN = c(1000,2000,5000,10000)
+            ,TrueG = c(5,10)
+            ,LL = c(1,2)
+            ,DD = c(2,4)
+            ,BO = c(0.01,0.05,0.1)
+            ,NumSim = 2
+            ,GGextra = 1)
+nrow(params)
+head(params, n=16)
 
-# Print the recorded start_time from config
-cat("Start time:",substr(capture.output(print(config$start_time)),6,29),"\n")
+make_indices <- function(params) {
+  
+  # Dividing the parameters into sets of 16 so that NN, TrueG and LL are
+  # balanced, means we have 96/16 = 6 runs, that each run should take
+  # about 26 hours. Provide 30 hours for each run in SLURM.
+  index_set <- split(1:nrow(params), rep(1:6, each=16))
+  
+  sat_id <- Sys.getenv('SLURM_ARRAY_TASK_ID')
+  if (sat_id != "") {
+    sat_id <- as.integer(sat_id)
+    indices <- index_set[[sat_id]]
+  } else {
+    indices <- 1:nrow(params) 
+  }
+}
 
-# Perform simulations
-results <- NULL
-t <- system.time({
-  results <- simulation(config)
-})
+indices <- make_indices(params)
 
-# Save results
-save_results(results, config$slurm_task_id)
+params <- params[indices,]
 
-# Print diagnostics
-cat("Number of ms_draws errored out: ", sum(errored(results)),"\n")
-cat("User time = ", t[1],"s\n")
-cat("---- structure of output ----\n")
-peek(results)
+params$GGmax <- params$TrueG + params$GGextra
+params$GGextra <- NULL
+
+results_list <- list()
+time_list <- list()
+npar <- nrow(params)
+for (i in 1:npar) {
+  par <- params[i,]
+  t <- system.time({
+    results_i <- do.call(arma3, par)
+    results_list[[i]] <- results_i
+  })
+  time_list[[i]] <- t
+  filename <- paste0(paste0(names(par),"=",par,"-", collapse = ""),".rds")
+  saveRDS(structure(results_i,t=t), filename)
+}
+saveRDS(results_list, "all_results.rds")
+
+estimate_full_time <- function(t) {
+  # Df <- 2
+  # Bf <- 3
+  # Lf <- 2
+   NSf <- 50
+   #return(t[1]*Df*Bf*Lf*NSf)
+   return(t[1]*NSf)
+}
+
+full_time <- sum(unlist(lapply(time_list, estimate_full_time))/3600)
+
+
+
+
+
+
+
+
+
+
+
+
