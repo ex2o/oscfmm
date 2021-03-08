@@ -11,7 +11,7 @@ load_packages(packages)
 
 #results <- readRDS("results1_.rds")
 
-dir <- "../results/local/sim_rcpp/"
+dir <- "../../results/local/new_method/"
 names <- list.files(dir)
 files <- paste0(dir, names)
 

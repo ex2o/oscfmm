@@ -6,26 +6,16 @@ library(inline)
 
 source("Big_test_arma_3.R")
 
-# Seed
-# set.seed(4200) 
-
-# A grid of simulation parameters
-params <- expand.grid(NN = c(1000,2000,5000,10000)
-            ,TrueG = c(5,10)
-            ,LL = c(1,2)
-            ,DD = c(2,4)
-            ,BO = c(0.01,0.05,0.1)
-            ,NumSim = 2
-            ,GGextra = 1)
+params <- read.csv("to-catch.csv")
+params <- params[,-1]
 nrow(params)
-head(params, n=16)
+
 
 make_indices <- function(params) {
   
-  # Dividing the parameters into sets of 16 so that NN, TrueG and LL are
-  # balanced, means we have 96/16 = 6 runs, that each run should take
-  # about 26 hours. Provide 30 hours for each run in SLURM.
-  index_set <- split(1:nrow(params), rep(1:6, each=16))
+  # An 8 element slurm array for 16 grid points has 2 grid points
+  # per array element.
+  index_set <- split(1:nrow(params), rep(1:8, each=2))
   
   sat_id <- Sys.getenv('SLURM_ARRAY_TASK_ID')
   if (sat_id != "") {
@@ -58,26 +48,3 @@ for (i in 1:npar) {
 }
 saveRDS(results_list, paste0(
   "all_results",Sys.getenv('SLURM_ARRAY_TASK_ID'),".rds"))
-
-# estimate_full_time <- function(t) {
-#   # Df <- 2
-#   # Bf <- 3
-#   # Lf <- 2
-#    NSf <- 50
-#    #return(t[1]*Df*Bf*Lf*NSf)
-#    return(t[1]*NSf)
-# }
-# 
-# full_time <- sum(unlist(lapply(time_list, estimate_full_time))/3600)
-
-
-
-
-
-
-
-
-
-
-
-
