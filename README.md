@@ -1,5 +1,6 @@
 # oscfmm
-Order Selection with Confidence for Finite Mixture Models
+
+Scripts and simulation results and for the paper [Nguyen, H., Fryer, D., & Mclachlan, G. (2021). Order selection with confidence for finite mixture models](https://arxiv.org/abs/2103.10640).
 
 ### Details
 
