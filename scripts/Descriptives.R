@@ -7,21 +7,28 @@ packages <- c("magrittr",
               "xtable")
 load_packages(packages)
 
+### Uncomment if you have just run the simulations yourself: -----------
 
-dir <- "../results/local/new_method/"
-names <- list.files(dir)
-files <- paste0(dir, names)
+# dir <- "F:/Datasets/oscfmm/local/new_method/"
+# names <- list.files(dir)
+# files <- paste0(dir, names)
+# 
+# # load the result files
+# results_list <- sapply(files, readRDS)
+# 
+# # Peek at the result list structure
+# peek(results_list)
+# str(results_list[[1]])
+# 
+# res <- combine_first_accepts(results_list)
+# head(res)
+# saveRDS(res, file = "formatted_results.Rds")
 
-# load the result files
-results_list <- sapply(files, readRDS)
+### ---------------------------------------------------------------------
 
-# Peek at the result list structure
-peek(results_list)
-str(results_list[[1]])
 
-res <- combine_first_accepts(results_list)
-head(res)
-
+## Load the formatted / simplified results  
+res <- readRDS("../results/formatted_results.Rds")
 
 # Checking results --------------------------------------------------------
 
