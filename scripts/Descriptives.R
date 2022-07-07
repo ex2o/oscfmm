@@ -1,3 +1,4 @@
+library(dplyr)
 source("Descriptive_functions.R")
 source("Utility_functions.R")
 packages <- c("magrittr",
@@ -7,28 +8,32 @@ packages <- c("magrittr",
               "xtable")
 load_packages(packages)
 
+dir <- "./temp_results/" # set to the directory of the simulation results files
+
 ### Uncomment if you have just run the simulations yourself: -----------
 
-# dir <- "F:/Datasets/oscfmm/local/new_method/"
-# names <- list.files(dir)
-# files <- paste0(dir, names)
-# 
-# # load the result files
-# results_list <- sapply(files, readRDS)
-# 
-# # Peek at the result list structure
-# peek(results_list)
-# str(results_list[[1]])
-# 
-# res <- combine_first_accepts(results_list)
-# head(res)
-# saveRDS(res, file = "formatted_results.Rds")
+names <- list.files(dir)
+names <- names[names != "all_results.rds"]
+names <- names[names != "formatted_results.Rds"]
+files <- paste0(dir, names)
+
+# load the result files
+results_list <- sapply(files, readRDS)
+
+# Peek at the result list structure
+peek(results_list)
+str(results_list[[1]])
+
+res <- combine_first_accepts(results_list)
+head(res)
+saveRDS(res, file = paste0(dir,"formatted_results.Rds"))
+
+results_list
 
 ### ---------------------------------------------------------------------
 
-
 ## Load the formatted / simplified results  
-res <- readRDS("../results/formatted_results.Rds")
+res <- readRDS(paste0(dir,"formatted_results.Rds"))
 
 # Checking results --------------------------------------------------------
 
@@ -45,7 +50,6 @@ res %>% filter(TrueG == 5) %>% .[["p3"]] %>% hist(main = "First DNR, TrueG = 5")
 res %>% filter(TrueG == 5, DD == 2, BO == 0.01) %>% .[["p3"]] %>% hist(main = "First DNR, TrueG = 5, DD = 2, BO = 0.01")
 
 res %>% filter(TrueG == 5, DD == 2, BO == 0.1) %>% .[["p3"]] %>% hist(main = "First DNR, TrueG = 5, DD = 2, BO = 0.1")
-
 
 # Look at significance levels
 res$LL <- as.integer(res$LL)
