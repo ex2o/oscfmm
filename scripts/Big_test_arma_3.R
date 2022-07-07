@@ -80,7 +80,13 @@ arma3 <- function(NN, DD, BO, TrueG, LL, NumSim, GGmax) {
       })
     }
     
-    result_list[[ii]] <- structure(p_mat, config=config)
+    result_list[[ii]] <- structure(p_mat, config=config,
+                                   Log_lik_MC2_alt_on_D1 = ts$Log_lik_MC2_alt_on_D1,
+                                   Log_lik_MC1_alt_on_D2 = ts$Log_lik_MC1_alt_on_D2,
+                                   Log_lik_MC1_null = ts$Log_lik_MC1_null,
+                                   Log_lik_MC2_null = ts$Log_lik_MC2_null,
+                                   Log_lik_MC1_alt  = ts$Log_lik_MC1_alt,
+                                   Log_lik_MC2_alt  = ts$Log_lik_MC2_alt)
   }
   
   return(result_list)
@@ -98,13 +104,13 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
                            centers = GG,
                            iter.max = 100, 
                            nstar = 100)
-    param_init <- me('VVV',Data1$X,
+    param_init <- me(modelName='VVV', data=Data1$X,
                      z=unmap(K_means_init$cluster),
                      control=emControl(itmax=1))
   } else {
     
     # use mclust to convert kmeans to parameters 
-    param_init <- me('VVV',Data1$X[Data1$id<=GG,],
+    param_init <- me(modelName='VVV', data=Data1$X[Data1$id<=GG,],
                      z=unmap(Data1$id[Data1$id<=GG]),
                      control=emControl(itmax=1)) 
     
@@ -122,12 +128,12 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
                            centers = GG,
                            iter.max = 100, 
                            nstar = 100)
-    param_init <- me('VVV',Data2$X,
+    param_init <- me(modelName='VVV', data=Data2$X,
                      z=unmap(K_means_init$cluster),
                      control=emControl(itmax=1))
   } else {
     
-    param_init <- me('VVV',Data2$X[Data2$id<=GG,],
+    param_init <- me(modelName='VVV', data=Data2$X[Data2$id<=GG,],
                      z=unmap(Data2$id[Data2$id<=GG]),
                      control=emControl(itmax=1))
     
@@ -147,13 +153,13 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
                            centers = GG+LL,
                            iter.max = 100, 
                            nstar = 100)
-    param_init <- me('VVV',Data1$X,
+    param_init <- me(modelName='VVV', data=Data1$X,
                      z=unmap(K_means_init$cluster),
                      control=emControl(itmax=1))
   } else {
      
     
-    param_init <- me('VVV',Data1$X[Data1$id<=(GG+LL),],
+    param_init <- me(modelName='VVV', data=Data1$X[Data1$id<=(GG+LL),],
                      z=unmap(Data1$id[Data1$id<=(GG+LL)]),
                      control=emControl(itmax=1)) 
     
@@ -173,12 +179,12 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
                            centers = GG+LL,
                            iter.max = 100, 
                            nstar = 100)
-    param_init <- me('VVV',Data2$X,
+    param_init <- me(modelName='VVV', data=Data2$X,
                      z=unmap(K_means_init$cluster),
                      control=emControl(itmax=1))
   } else {
     
-    param_init <- me('VVV',Data2$X[Data2$id<=(GG+LL),],
+    param_init <- me(modelName='VVV', data=Data2$X[Data2$id<=(GG+LL),],
                      z=unmap(Data2$id[Data2$id<=(GG+LL)]),
                      control=emControl(itmax=1))  
   }
@@ -209,5 +215,11 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
   V2 <- exp(Log_lik_MC1_alt_on_D2 - MC2_null$`log-likelihood`)
   V_bar <- (V1+V2)/2
   
-  return(list(V1 = V1, V2 = V2, V_bar = V_bar))
+  return(list(V1 = V1, V2 = V2, V_bar = V_bar,
+              Log_lik_MC2_alt_on_D1 = Log_lik_MC2_alt_on_D1,
+              Log_lik_MC1_alt_on_D2 = Log_lik_MC1_alt_on_D2,
+              Log_lik_MC1_null = MC1_null$`log-likelihood`,
+              Log_lik_MC2_null = MC2_null$`log-likelihood`,
+              Log_lik_MC1_alt = MC1_alt$`log-likelihood`,
+              Log_lik_MC2_alt = MC2_alt$`log-likelihood`))
 }
