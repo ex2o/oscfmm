@@ -40,3 +40,6 @@ scripts/*.rds
 
 # ignore results files in local results folder
 results/local/
+
+# ignore temporary simulation results
+*temp_results
