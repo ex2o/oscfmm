@@ -72,6 +72,7 @@ for (i in 1:npar) {
   time_list[[i]] <- t
   filename <- paste0(temp_results,"/",paste0(names(par),"=",par,"-", collapse = ""),".rds")
   saveRDS(structure(results_i,t=t), filename)
+  cat(paste0("completed params[",i,",] in time t=",round(t[3],1),"s. Remaining params=",npar-i,"\n"))
 }
 saveRDS(results_list, paste0(temp_results, "/",
   "all_results",Sys.getenv('SLURM_ARRAY_TASK_ID'),".rds"))
