@@ -31,6 +31,7 @@ GMM_arma <- cxxfunction(signature(data_r='numeric',
 arma3 <- function(NN, DD, BO, TrueG, LL, NumSim, GGmax) { 
   
   p_mat <- matrix(0,GGmax,3)
+  loglik <- rep(0,length=GGmax)
   result_list <- list()
   
   for (ii in 1:NumSim) {
@@ -72,21 +73,18 @@ arma3 <- function(NN, DD, BO, TrueG, LL, NumSim, GGmax) {
           P1 <- min(1/ts$V1,1)
           P2 <- min(1/ts$V2,1)
           P_bar <- min(1/ts$V_bar,1)
+          loglik_GG <- ts$Log_lik_full
           
           p_mat[GG,] <- c(P1, P2, P_bar)
-          print(as.integer(c(ii,GG,P_bar)))
+          loglik[GG] <- loglik_GG
+          # print(as.integer(c(ii,GG,P_bar,loglik_GG)))
           
         }
       })
     }
     
     result_list[[ii]] <- structure(p_mat, config=config,
-                                   Log_lik_MC2_alt_on_D1 = ts$Log_lik_MC2_alt_on_D1,
-                                   Log_lik_MC1_alt_on_D2 = ts$Log_lik_MC1_alt_on_D2,
-                                   Log_lik_MC1_null = ts$Log_lik_MC1_null,
-                                   Log_lik_MC2_null = ts$Log_lik_MC2_null,
-                                   Log_lik_MC1_alt  = ts$Log_lik_MC1_alt,
-                                   Log_lik_MC2_alt  = ts$Log_lik_MC2_alt)
+                                   Log_lik_full=loglik)
   }
   
   return(result_list)
@@ -215,11 +213,23 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
   V2 <- exp(Log_lik_MC1_alt_on_D2 - MC2_null$`log-likelihood`)
   V_bar <- (V1+V2)/2
   
+  ##### Calculate log likelihood on combined data, for AIC and BIC #####
+  Data_all_X <- rbind(Data1$X, Data2$X)
+  
+  Log_lik_full <- GMM_arma(t(Data_all_X),
+           param_init$parameters$pro, 
+           param_init$parameters$mean,
+           param_init$parameters$variance$sigma,
+           500,GG)$`log-likelihood` # fewer iterations, due to double sample size
+  
+  
   return(list(V1 = V1, V2 = V2, V_bar = V_bar,
-              Log_lik_MC2_alt_on_D1 = Log_lik_MC2_alt_on_D1,
-              Log_lik_MC1_alt_on_D2 = Log_lik_MC1_alt_on_D2,
-              Log_lik_MC1_null = MC1_null$`log-likelihood`,
-              Log_lik_MC2_null = MC2_null$`log-likelihood`,
-              Log_lik_MC1_alt = MC1_alt$`log-likelihood`,
-              Log_lik_MC2_alt = MC2_alt$`log-likelihood`))
+              Log_lik_full = Log_lik_full))
+  
+  # Log_lik_MC2_alt_on_D1 = Log_lik_MC2_alt_on_D1
+  # Log_lik_MC1_alt_on_D2 = Log_lik_MC1_alt_on_D2
+  # Log_lik_MC1_null = MC1_null$`log-likelihood`
+  # Log_lik_MC2_null = MC2_null$`log-likelihood`
+  # Log_lik_MC1_alt = MC1_alt$`log-likelihood`
+  # Log_lik_MC2_alt = MC2_alt$`log-likelihood`
 }

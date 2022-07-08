@@ -28,7 +28,8 @@ res <- combine_first_accepts(results_list)
 head(res)
 saveRDS(res, file = paste0(dir,"formatted_results.Rds"))
 
-results_list
+# Example vector of log likelihoods on rbind(Data1$X, Data2$X), for AIC and BIC
+attr(results_list[[1]], 'Log_lik_full')
 
 ### ---------------------------------------------------------------------
 
