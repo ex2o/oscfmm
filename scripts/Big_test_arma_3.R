@@ -143,6 +143,15 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
                        param_init$parameters$variance$sigma,
                        2000,GG)
   
+  ##### Calculate log likelihood on combined data, for AIC and BIC #####
+  Data_all_X <- rbind(Data1$X, Data2$X)
+  
+  Log_lik_full <- GMM_arma(t(Data_all_X),
+                           param_init$parameters$pro, 
+                           param_init$parameters$mean,
+                           param_init$parameters$variance$sigma,
+                           500,GG)$`log-likelihood` # fewer iterations, due to double sample size
+  
 
   ##### Fit mixtures under the alternative hypothesis #####
   
@@ -168,8 +177,6 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
                       param_init$parameters$mean,
                       param_init$parameters$variance$sigma,
                       2000,GG+LL)
-  
-
   
   if (GG + LL > TrueG) {
     
@@ -212,15 +219,6 @@ compute_ts <- function(Data1, Data2, GG, LL, TrueG) {
                                     0,GG+LL)$`log-likelihood`
   V2 <- exp(Log_lik_MC1_alt_on_D2 - MC2_null$`log-likelihood`)
   V_bar <- (V1+V2)/2
-  
-  ##### Calculate log likelihood on combined data, for AIC and BIC #####
-  Data_all_X <- rbind(Data1$X, Data2$X)
-  
-  Log_lik_full <- GMM_arma(t(Data_all_X),
-           param_init$parameters$pro, 
-           param_init$parameters$mean,
-           param_init$parameters$variance$sigma,
-           500,GG)$`log-likelihood` # fewer iterations, due to double sample size
   
   
   return(list(V1 = V1, V2 = V2, V_bar = V_bar,
