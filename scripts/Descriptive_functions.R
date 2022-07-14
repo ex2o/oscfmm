@@ -30,7 +30,7 @@ min_AIC <- function(x) {
   DD <- attr(x, 'config')$DD
   GG <- attr(x, 'config')$GG
   logL <- attr(x, 'Log_lik_full')
-  k <- (1 + 2*DD + choose(DD,2))*GG # Each component density has 1 + 2d + choose(d,2) parameters
+  k <- (1 + 2*DD + choose(DD,2))*(1:GG) # Each component density has 1 + 2d + choose(d,2) parameters
   which.min(2*(k - logL))
 }
 
@@ -39,7 +39,7 @@ min_BIC <- function(x) {
   GG <- attr(x, 'config')$GG
   logN <- log(2*attr(x, 'config')$NN)
   logL <- attr(x, 'Log_lik_full')
-  k <- (1 + 2*DD + choose(DD,2))*GG
+  k <- (1 + 2*DD + choose(DD,2))*(1:GG)
   which.min(k*logN - 2*logL)
 }
 
