@@ -50,3 +50,11 @@ combine_AIC_BIC_results <- function(results_list) {
   minBIC <- sapply(results_list, min_BIC)
   as_tibble(cbind(gp, minAIC, minBIC))
 }
+
+extract_datasets <- function(result_list) {
+  lapply(result_list, function(x){
+    rbind(attr(x, 'config')$Data1$X,
+          attr(x, 'config')$Data2$X)
+  })
+}
+

@@ -19,12 +19,19 @@ results_list <- sapply(files, readRDS)
 full_results <- unlist(results_list[[1]], recursive=F) # NN <= 500
 loglik_results <- unlist(results_list[[2]], recursive=F) # NN >= 1000
 
-# Some examples to look at the data structure
+# EXAMPLE: look at the data structure
 attr(full_results[[1]], 'Log_lik_full')
 attr(loglik_results[[1]], 'Log_lik_full')
 sapply(full_results, min_AIC) %>% table
 sapply(full_results, min_BIC) %>% table
 lapply(loglik_results, \(x){attr(x, 'Log_lik_full')})
+
+# EXAMPLE: extract all the datasets
+datasets <- c(extract_datasets(full_results),
+              extract_datasets(loglik_results))
+str(datasets)
+length(datasets)
+
 
 # compute AIC and BIC
 res_IC <- rbind(combine_AIC_BIC_results(full_results),
